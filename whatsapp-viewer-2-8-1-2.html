@@ -1,0 +1,3613 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>عارض شات واتساب</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  :root{
+    --wa-bg: #efeae2;
+    --wa-panel: #f0f2f5;
+    --wa-green: #00a884;
+    --wa-green-dark: #005c4b;
+    --wa-out: #d9fdd3;
+    --wa-in: #ffffff;
+    --wa-text: #111b21;
+    --wa-sub: #667781;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #d9dbd3;
+    display:flex;
+    justify-content:center;
+    min-height:100vh;
+  }
+  .app{
+    width:100%;
+    max-width:520px;
+    min-height:100vh;
+    background:var(--wa-bg);
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 0 20px rgba(0,0,0,0.15);
+    position:relative;
+    overflow:hidden;
+  }
+  .app::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image: radial-gradient(circle at 20% 20%, rgba(0,0,0,0.02) 1px, transparent 1px),
+                       radial-gradient(circle at 60% 70%, rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none;
+  }
+  header{
+    background:var(--wa-green-dark);
+    color:#fff;
+    padding:12px 16px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    z-index:2;
+  }
+  header .avatar{
+    width:38px;height:38px;border-radius:50%;
+    background:#fff3;
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;
+  }
+  header .info b{font-size:15px; display:block;}
+  header .info span{font-size:12px; opacity:0.85;}
+
+  .upload-screen{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    padding:32px 24px;
+    text-align:center;
+    z-index:2;
+  }
+  .upload-screen h1{
+    font-size:20px;
+    color:var(--wa-text);
+    margin:0;
+  }
+  .upload-screen p{
+    font-size:13px;
+    color:var(--wa-sub);
+    margin:0;
+    max-width:320px;
+    line-height:1.6;
+  }
+  .drop{
+    border:2px dashed #8ba39a;
+    border-radius:12px;
+    background:#ffffffcc;
+    width:100%;
+    max-width:320px;
+    padding:28px 16px;
+    cursor:pointer;
+    transition:0.15s;
+  }
+  .drop:hover, .drop.drag{
+    border-color:var(--wa-green);
+    background:#ffffff;
+  }
+  .drop input{display:none;}
+  .drop .icon{font-size:30px; margin-bottom:8px;}
+  .drop .label{font-size:14px; color:var(--wa-green-dark); font-weight:600;}
+  .drop .sub{font-size:12px; color:var(--wa-sub); margin-top:4px;}
+  .error-box{
+    background:#fdecea;
+    color:#b3261e;
+    border-radius:8px;
+    padding:10px 14px;
+    font-size:13px;
+    max-width:320px;
+  }
+  .loading-state{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    max-width:320px;
+    padding:20px 16px;
+  }
+  .loading-state .label{ font-size:14px; color:var(--wa-green-dark); font-weight:600; }
+  .loading-state .sub{ font-size:12px; color:var(--wa-sub); }
+  .spinner{
+    width:34px; height:34px;
+    border:3px solid #d7e8e3;
+    border-top-color:var(--wa-green);
+    border-radius:50%;
+    animation:wa-spin 0.8s linear infinite;
+  }
+  @keyframes wa-spin{ to{ transform:rotate(360deg); } }
+  body.dark .loading-state .label{ color:#e9edef; }
+
+  .messages{
+    flex:1;
+    overflow-y:auto;
+    padding:14px 10px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    z-index:2;
+  }
+  .day-sep{
+    align-self:center;
+    background:#e1f2fb;
+    color:#5b6b73;
+    font-size:12px;
+    padding:5px 12px;
+    border-radius:8px;
+    margin:10px 0;
+    box-shadow:0 1px 1px rgba(0,0,0,0.08);
+  }
+  .bubble-row{
+    display:flex;
+    width:100%;
+    content-visibility:auto;
+    contain-intrinsic-size:auto 60px;
+  }
+  .bubble-row.out{ justify-content:flex-start; }
+  .bubble-row.in{ justify-content:flex-end; }
+
+  .bubble{
+    max-width:75%;
+    padding:6px 9px 8px;
+    border-radius:8px;
+    font-size:var(--wa-font-size, 14.2px);
+    line-height:1.4;
+    position:relative;
+    box-shadow:0 1px 0.5px rgba(0,0,0,0.13);
+    word-wrap:break-word;
+    white-space:pre-wrap;
+    direction:auto;
+    unicode-bidi:plaintext;
+  }
+  .bubble.out{ background:var(--wa-out); border-top-right-radius:0; }
+  .bubble.in{ background:var(--wa-in); border-top-left-radius:0; }
+
+  .sender{
+    font-size:12.5px;
+    font-weight:700;
+    margin-bottom:2px;
+    display:block;
+    color:#d1373a;
+  }
+  .bubble.out .sender{ color:#1a7a5e; }
+
+  .meta{
+    display:inline-block;
+    float:left;
+    font-size:11px;
+    color:var(--wa-sub);
+    margin-top:2px;
+    margin-inline-start:6px;
+    direction:ltr;
+  }
+  .system-msg{
+    align-self:center;
+    background:#fef6db;
+    color:#8b6d1c;
+    font-size:12px;
+    padding:6px 10px;
+    border-radius:8px;
+    margin:8px 0;
+    max-width:80%;
+    text-align:center;
+  }
+
+  .toolbar{
+    padding:8px 14px;
+    background:var(--wa-panel);
+    display:flex;
+    align-items:center;
+    font-size:12px;
+    color:var(--wa-sub);
+    z-index:2;
+    border-top:1px solid #ddd;
+    gap:14px;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+  }
+  .toolbar #msgCount{ flex-shrink:0; }
+  .toolbar button{
+    background:none;
+    border:none;
+    color:var(--wa-green-dark);
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .toolbar button.active{
+    color:#c99a00;
+  }
+
+  .bubble{ padding-left:22px; }
+  .star-btn{
+    position:absolute;
+    top:4px;
+    left:2px;
+    width:18px;
+    height:18px;
+    border:none;
+    background:none;
+    cursor:pointer;
+    font-size:13px;
+    line-height:1;
+    color:#c7c7c7;
+    padding:0;
+    opacity:0.55;
+  }
+  .star-btn:hover{ opacity:1; }
+  .bubble.starred{
+    box-shadow:0 0 0 1.5px #ffcc33 inset, 0 1px 0.5px rgba(0,0,0,0.13);
+  }
+  .bubble.starred .star-btn{ color:#f0b400; opacity:1; }
+
+  .empty-starred{
+    align-self:center;
+    color:var(--wa-sub);
+    font-size:13px;
+    margin-top:30px;
+    text-align:center;
+    padding:0 30px;
+  }
+
+  .filter-bar{
+    display:flex;
+    gap:6px;
+    padding:8px 10px;
+    background:var(--wa-panel);
+    border-bottom:1px solid #ddd;
+    z-index:2;
+  }
+  .filter-bar input[type="text"]{
+    flex:1;
+    border:1px solid #ccc;
+    border-radius:8px;
+    padding:6px 10px;
+    font-size:13px;
+    outline:none;
+    font-family:inherit;
+  }
+  .filter-bar input[type="text"]:focus{ border-color:var(--wa-green); }
+  .filter-bar select{
+    border:1px solid #ccc;
+    border-radius:8px;
+    padding:6px 8px;
+    font-size:12.5px;
+    font-family:inherit;
+    background:#fff;
+    max-width:130px;
+  }
+  mark{
+    background:#ffe08a;
+    border-radius:2px;
+    padding:0 1px;
+  }
+  mark.mark-active{
+    background:#ff9800;
+    color:#fff;
+  }
+  .filter-toggle-btn{
+    border:1px solid #ccc;
+    border-radius:8px;
+    background:#fff;
+    font-size:13px;
+    padding:6px 8px;
+    cursor:pointer;
+    flex-shrink:0;
+    color:var(--wa-sub);
+  }
+  .filter-toggle-btn.active{
+    background:var(--wa-green);
+    border-color:var(--wa-green);
+    color:#fff;
+  }
+  body.dark .filter-toggle-btn{ background:#2a3942; border-color:#3b4a54; color:#e9edef; }
+  .adv-filters{
+    display:none;
+    flex-wrap:wrap;
+    gap:6px;
+    padding:0 10px 8px;
+    background:var(--wa-panel);
+    border-bottom:1px solid #ddd;
+    z-index:2;
+  }
+  .adv-filters.show{ display:flex; }
+  .adv-filters .date-field{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size:11.5px;
+    color:var(--wa-sub);
+  }
+  .adv-filters input[type="date"]{
+    border:1px solid #ccc;
+    border-radius:8px;
+    padding:5px 6px;
+    font-size:12px;
+    font-family:inherit;
+    background:#fff;
+  }
+  .adv-filters select{
+    border:1px solid #ccc;
+    border-radius:8px;
+    padding:5px 8px;
+    font-size:12px;
+    font-family:inherit;
+    background:#fff;
+  }
+  body.dark .adv-filters{ background:#202c33; border-color:#2a3942; }
+  body.dark .adv-filters input[type="date"], body.dark .adv-filters select{
+    background:#2a3942; border-color:#3b4a54; color:#e9edef;
+  }
+  .adv-filters .clear-adv{
+    font-size:11.5px;
+    color:var(--wa-green-dark);
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-weight:600;
+  }
+  .search-count{ display:flex; align-items:center; gap:8px; }
+  .search-nav{
+    display:none;
+    align-items:center;
+    gap:4px;
+  }
+  .search-nav.show{ display:inline-flex; }
+  .bubble.search-focus{
+    box-shadow:0 0 0 2px #ff9800 inset, 0 1px 0.5px rgba(0,0,0,0.13);
+    transition:box-shadow 0.2s;
+  }
+  .search-nav button{
+    border:1px solid #ccc;
+    background:#fff;
+    color:var(--wa-green-dark);
+    border-radius:6px;
+    width:20px;
+    height:20px;
+    font-size:11px;
+    line-height:1;
+    cursor:pointer;
+    padding:0;
+  }
+  body.dark .search-nav button{ background:#2a3942; border-color:#3b4a54; color:#e9edef; }
+  .no-results{
+    align-self:center;
+    color:var(--wa-sub);
+    font-size:13px;
+    margin-top:30px;
+    text-align:center;
+    padding:0 30px;
+  }
+  .media-img{
+    max-width:100%;
+    border-radius:6px;
+    display:block;
+    margin-bottom:4px;
+    cursor:pointer;
+  }
+  .media-video{
+    max-width:100%;
+    border-radius:6px;
+    display:block;
+    margin-bottom:4px;
+  }
+  .media-missing{
+    font-size:12.5px;
+    color:var(--wa-sub);
+    font-style:italic;
+    display:block;
+    margin-bottom:4px;
+  }
+  .media-audio{
+    display:block;
+    max-width:230px;
+    height:34px;
+    margin-bottom:4px;
+  }
+  .audio-wrap{ display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .audio-wrap .media-audio{ margin-bottom:0; }
+  .audio-duration{ font-size:11px; color:var(--wa-sub); white-space:nowrap; }
+  .voice-transcript{
+    font-size:12.5px; line-height:1.6; color:var(--wa-text);
+    background:rgba(0,0,0,0.04); border-radius:8px; padding:6px 8px;
+    margin-bottom:4px; direction:auto;
+  }
+  body.dark .voice-transcript{ background:rgba(255,255,255,0.06); color:#e9edef; }
+  .voice-tone-badge{
+    font-size:10.5px; color:var(--wa-sub); margin-bottom:4px; display:block;
+  }
+  body.dark .voice-tone-badge{ color:#8696a0; }
+  .voice-progress-note{
+    font-size:11px; color:#7a5c00; background:#fff6e0; border-radius:8px;
+    padding:8px 10px; margin-bottom:10px; line-height:1.6;
+  }
+  body.dark .voice-progress-note{ background:#3a3320; color:#e0c876; }
+  .voice-progress-bar{
+    width:100%; height:8px; background:#e9edef; border-radius:5px; overflow:hidden; margin-top:6px;
+  }
+  body.dark .voice-progress-bar{ background:#2a3942; }
+  .voice-progress-fill{ height:100%; background:var(--wa-green); border-radius:5px; width:0%; transition:width .2s; }
+  .bubble a{ color:inherit; text-decoration:underline; word-break:break-all; }
+  .bubble.in a{ color:#0a6cff; }
+  body.dark .bubble a{ color:#53bdeb; }
+  .bubble.emoji-only{ background:none; box-shadow:none; }
+  .bubble.emoji-only .emoji-content{ font-size:40px; line-height:1.25; display:block; }
+
+  .search-count{
+    font-size:11.5px;
+    color:var(--wa-sub);
+    padding:0 14px;
+    margin-top:-2px;
+    margin-bottom:2px;
+    z-index:2;
+  }
+
+  .stats-overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.45);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:10;
+    padding:20px;
+  }
+  .stats-card{
+    background:#fff;
+    border-radius:12px;
+    width:100%;
+    max-width:340px;
+    max-height:80%;
+    overflow-y:auto;
+    box-shadow:0 8px 30px rgba(0,0,0,0.25);
+  }
+  .stats-header{
+    background:var(--wa-green-dark);
+    color:#fff;
+    padding:14px 16px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-radius:12px 12px 0 0;
+  }
+  .stats-header button{
+    background:none;
+    border:none;
+    color:#fff;
+    font-size:16px;
+    cursor:pointer;
+  }
+  #statsBody{ padding:16px; }
+  .stat-row{
+    display:flex;
+    justify-content:space-between;
+    padding:7px 0;
+    border-bottom:1px solid #eee;
+    font-size:13.5px;
+    color:var(--wa-text);
+  }
+  .stat-row b{ color:var(--wa-green-dark); }
+  .stat-section-title{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    color:var(--wa-sub);
+    margin:14px 0 4px;
+  }
+  .stat-section-title:first-child{ margin-top:0; }
+
+  .love-disclaimer{
+    background:#fff6e0;
+    color:#7a5c00;
+    font-size:11.5px;
+    line-height:1.6;
+    padding:10px 12px;
+    border-radius:8px;
+    margin-bottom:14px;
+  }
+  body.dark .love-disclaimer{ background:#3a3320; color:#e0c876; }
+
+  .love-empty{
+    font-size:13px;
+    color:var(--wa-sub);
+    text-align:center;
+    padding:20px 10px;
+  }
+
+  .love-score-block{ margin-bottom:16px; }
+  .love-score-name{
+    font-size:13.5px;
+    font-weight:700;
+    color:var(--wa-text);
+    margin-bottom:4px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  body.dark .love-score-name{ color:#e9edef; }
+  .love-score-name .love-score-num{ color:var(--wa-green-dark); font-size:14px; }
+  body.dark .love-score-name .love-score-num{ color:#00d9a3; }
+  .interest-bar-wrap{
+    width:100%;
+    height:10px;
+    background:#e9edef;
+    border-radius:6px;
+    overflow:hidden;
+  }
+  body.dark .interest-bar-wrap{ background:#2a3942; }
+  .interest-bar-fill{
+    height:100%;
+    border-radius:6px;
+    background:linear-gradient(90deg, #ffb199, #ff5c7a);
+  }
+
+  .love-metric-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:12px;
+    color:var(--wa-sub);
+    padding:4px 0;
+    border-bottom:1px dashed #eee;
+  }
+  body.dark .love-metric-row{ border-color:#2a3942; color:#8696a0; }
+
+  .personality-tags{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:6px;
+    margin-bottom:14px;
+  }
+  .personality-tag{
+    background:#e7f7f1;
+    color:var(--wa-green-dark);
+    font-size:12px;
+    padding:5px 10px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  body.dark .personality-tag{ background:#123d31; color:#5fe3bd; }
+
+  .relationship-verdict{
+    background:#f0f2f5;
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:13px;
+    line-height:1.7;
+    color:var(--wa-text);
+    margin-top:6px;
+  }
+  body.dark .relationship-verdict{ background:#202c33; color:#e9edef; }
+
+  .mini-bar-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:12px;
+    color:var(--wa-sub);
+    padding:3px 0;
+  }
+  .mini-bar-row .mini-bar-label{ width:60px; flex-shrink:0; }
+  .mini-bar-row .mini-bar-track{
+    flex:1;
+    height:8px;
+    background:#e9edef;
+    border-radius:5px;
+    overflow:hidden;
+  }
+  body.dark .mini-bar-row .mini-bar-track{ background:#2a3942; }
+  .mini-bar-row .mini-bar-fill{
+    height:100%;
+    border-radius:5px;
+    background:var(--wa-green);
+  }
+  .mini-bar-row .mini-bar-count{ width:24px; text-align:left; flex-shrink:0; }
+
+  .turning-point-row{
+    font-size:12.5px;
+    line-height:1.6;
+    padding:6px 0;
+    border-bottom:1px dashed #eee;
+    color:var(--wa-text);
+  }
+  body.dark .turning-point-row{ border-color:#2a3942; color:#e9edef; }
+
+  .compare-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .compare-row select{
+    flex:1;
+    padding:6px 8px;
+    border-radius:6px;
+    border:1px solid #ddd;
+    font-size:12.5px;
+    background:#fff;
+    color:var(--wa-text);
+  }
+  body.dark .compare-row select{ background:#2a3942; border-color:#3b4a54; color:#e9edef; }
+  .compare-row span{ font-size:12px; color:var(--wa-sub); flex-shrink:0; }
+  .compare-btn{
+    width:100%;
+    padding:8px;
+    border:none;
+    border-radius:8px;
+    background:var(--wa-green);
+    color:#fff;
+    font-size:13px;
+    cursor:pointer;
+    margin-bottom:10px;
+  }
+  .compare-header{
+    display:flex;
+    justify-content:space-between;
+    font-size:12px;
+    font-weight:700;
+    color:var(--wa-green-dark);
+    padding:6px 0 2px;
+  }
+  body.dark .compare-header{ color:#00d9a3; }
+
+  /* Dark mode */
+  body.dark{ background:#0b141a; }
+  body.dark .app{ background:#0b141a; }
+  body.dark header{ background:#202c33; }
+  body.dark .filter-bar{ background:#202c33; border-color:#2a3942; }
+  body.dark .filter-bar input[type="text"]{ background:#2a3942; border-color:#3b4a54; color:#e9edef; }
+  body.dark .filter-bar select{ background:#2a3942; border-color:#3b4a54; color:#e9edef; }
+  body.dark .bubble.in{ background:#202c33; color:#e9edef; }
+  body.dark .bubble.out{ background:#005c4b; color:#e9edef; }
+  body.dark .meta{ color:#8696a0; }
+  body.dark .day-sep{ background:#182229; color:#8696a0; }
+  body.dark .toolbar{ background:#202c33; border-color:#2a3942; color:#8696a0; }
+  body.dark .upload-screen h1{ color:#e9edef; }
+  body.dark .drop{ background:#202c33cc; border-color:#3b4a54; }
+  body.dark .stats-card{ background:#202c33; color:#e9edef; }
+  body.dark .stat-row{ border-color:#2a3942; color:#e9edef; }
+  body.dark .search-count{ color:#8696a0; }
+  body.dark .gallery-card{ background:#202c33; }
+
+  .theme-toggle{
+    margin-inline-start:auto;
+    background:none;
+    border:none;
+    color:#fff;
+    font-size:18px;
+    cursor:pointer;
+    padding:4px;
+  }
+
+  /* Gallery */
+  .gallery-overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.5);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:10;
+    padding:20px;
+  }
+  .gallery-card{
+    background:#fff;
+    border-radius:12px;
+    width:100%;
+    max-width:380px;
+    max-height:82%;
+    overflow-y:auto;
+  }
+  .gallery-tabs{
+    display:flex;
+    gap:6px;
+    padding:10px 12px 0;
+  }
+  .gallery-tab{
+    flex:1;
+    text-align:center;
+    padding:6px 4px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    background:#fff;
+    font-size:12.5px;
+    cursor:pointer;
+    color:var(--wa-sub);
+  }
+  .gallery-tab.active{
+    background:var(--wa-green);
+    color:#fff;
+    border-color:var(--wa-green);
+  }
+  body.dark .gallery-tab{ background:#2a3942; border-color:#3b4a54; color:#e9edef; }
+  .gallery-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:4px;
+    padding:12px;
+  }
+  .gallery-video-thumb, .gallery-audio-thumb{
+    width:100%;
+    aspect-ratio:1;
+    border-radius:4px;
+    cursor:pointer;
+    background:#eee;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:22px;
+    color:var(--wa-sub);
+  }
+  body.dark .gallery-video-thumb, body.dark .gallery-audio-thumb{ background:#2a3942; }
+  .gallery-thumb{
+    width:100%;
+    aspect-ratio:1;
+    object-fit:cover;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  .gallery-empty{
+    padding:30px 20px;
+    text-align:center;
+    color:var(--wa-sub);
+    font-size:13px;
+  }
+
+  /* Print */
+  @media print{
+    body{ background:#fff; }
+    .app{ box-shadow:none; max-width:100%; }
+    .filter-bar, .adv-filters, .toolbar, .star-btn, .theme-toggle, .copy-btn{ display:none !important; }
+    .messages{ overflow:visible; }
+    .day-sep{ box-shadow:none; }
+  }
+
+  .lightbox{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.9);
+    z-index:20;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .lightbox img{
+    max-width:100%;
+    max-height:100%;
+    border-radius:4px;
+  }
+  .lightbox-close{
+    position:absolute;
+    top:16px;
+    left:16px;
+    background:rgba(255,255,255,0.15);
+    border:none;
+    color:#fff;
+    font-size:18px;
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    cursor:pointer;
+  }
+
+  .copy-btn{
+    position:absolute;
+    top:4px;
+    right:2px;
+    width:18px;
+    height:18px;
+    border:none;
+    background:none;
+    cursor:pointer;
+    font-size:12px;
+    line-height:1;
+    color:#8a9a94;
+    padding:0;
+    opacity:0.5;
+  }
+  .copy-btn:hover{ opacity:1; }
+  .bubble{ padding-right:20px; }
+
+  .settings-toggle{
+    background:none;
+    border:none;
+    color:#fff;
+    font-size:18px;
+    cursor:pointer;
+    padding:4px;
+  }
+  .settings-card{
+    background:#fff;
+    border-radius:12px;
+    width:100%;
+    max-width:320px;
+  }
+  .settings-section{ padding:14px 16px; border-bottom:1px solid #eee; }
+  .settings-section:last-child{ border-bottom:none; }
+  .settings-label{
+    font-size:12.5px;
+    color:var(--wa-sub);
+    margin-bottom:8px;
+    display:block;
+  }
+  .swatches{ display:flex; gap:10px; }
+  .swatch{
+    width:30px; height:30px; border-radius:50%;
+    cursor:pointer;
+    border:2px solid transparent;
+  }
+  .swatch.active{ border-color:#333; }
+  .font-options{ display:flex; gap:8px; }
+  .font-option{
+    flex:1;
+    padding:8px 0;
+    text-align:center;
+    border:1px solid #ccc;
+    border-radius:8px;
+    background:#fff;
+    cursor:pointer;
+    font-size:13px;
+  }
+  .font-option.active{
+    background:var(--wa-green);
+    color:#fff;
+    border-color:var(--wa-green);
+  }
+  body.dark .settings-card{ background:#202c33; color:#e9edef; }
+  body.dark .settings-section{ border-color:#2a3942; }
+  body.dark .font-option{ background:#2a3942; border-color:#3b4a54; color:#e9edef; }
+
+  .load-more{
+    align-self:center;
+    background:#fff;
+    border:1px solid #ccc;
+    border-radius:20px;
+    padding:8px 18px;
+    font-size:13px;
+    color:var(--wa-green-dark);
+    cursor:pointer;
+    margin:14px 0;
+  }
+  body.dark .load-more{ background:#202c33; border-color:#3b4a54; color:#e9edef; }
+  .results-info{
+    align-self:center;
+    font-size:11.5px;
+    color:var(--wa-sub);
+    margin-bottom:4px;
+  }
+
+  .scroll-bottom-btn{
+    position:absolute;
+    bottom:66px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#fff;
+    border:1px solid #ccc;
+    color:var(--wa-green-dark);
+    width:36px;
+    height:36px;
+    border-radius:50%;
+    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+    cursor:pointer;
+    font-size:15px;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:5;
+  }
+  .scroll-bottom-btn.show{ display:flex; }
+  body.dark .scroll-bottom-btn{ background:#202c33; border-color:#3b4a54; color:#e9edef; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div id="uploadScreen" class="upload-screen">
+    <div>
+      <div class="icon" style="font-size:38px;">💬</div>
+      <h1>عارض شات واتساب</h1>
+      <p>ارفع ملف التصدير (.txt أو .zip اللي فيه الميديا) اللي طلعته من واتساب، وهيتعرض هنا بشكل شبيه بالمحادثة الأصلية.</p>
+    </div>
+    <label class="drop" id="dropZone">
+      <input type="file" id="fileInput" accept=".txt,.zip"/>
+      <div class="label">📂 اختر الملف أو اسحبه هنا</div>
+      <div class="sub">يدعم ملفات .txt و .zip</div>
+    </label>
+    <div id="loadingState" class="loading-state" style="display:none;">
+      <div class="spinner"></div>
+      <div class="label" id="loadingLabel">⏳ بيتم تجهيز الملف...</div>
+      <div class="sub" id="loadingSub">من فضلك متقفلش الصفحة</div>
+    </div>
+    <div id="errorBox"></div>
+    <p style="font-size:11.5px; color:#8a9a94; max-width:300px; line-height:1.6;">🔒 كل حاجة بتتم جوه المتصفح بتاعك بس — الملف مش بيتبعت لأي سيرفر، وده يفضل صح حتى لو الملف اتبعت لحد تاني يفتحه بنفسه.</p>
+  </div>
+
+  <div id="chatScreen" style="display:none; flex:1; flex-direction:column; min-height:100vh;">
+    <header>
+      <div class="avatar">💬</div>
+      <div class="info">
+        <b id="chatTitle">المحادثة</b>
+        <span id="chatSub"></span>
+      </div>
+      <button class="theme-toggle" id="themeToggle" title="تبديل الوضع الليلي">🌙</button>
+      <button class="settings-toggle" id="settingsToggle" title="إعدادات المظهر">⚙️</button>
+    </header>
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="🔍 دور في الرسايل... أو اكتب امبارح / الأسبوع اللي فات"/>
+      <select id="senderFilter">
+        <option value="">كل الأشخاص</option>
+      </select>
+      <select id="dateJump" title="روح لتاريخ معيّن">
+        <option value="">📅 التاريخ</option>
+      </select>
+      <button type="button" class="filter-toggle-btn" id="advToggleBtn" title="فلاتر إضافية">🔧</button>
+    </div>
+    <div class="adv-filters" id="advFilters">
+      <div class="date-field">
+        <span>من</span>
+        <input type="date" id="dateFromInput"/>
+      </div>
+      <div class="date-field">
+        <span>لـ</span>
+        <input type="date" id="dateToInput"/>
+      </div>
+      <select id="typeFilter" title="فلترة حسب نوع الرسالة">
+        <option value="">كل الأنواع</option>
+        <option value="image">🖼️ صور بس</option>
+        <option value="video">🎬 فيديو بس</option>
+        <option value="audio">🎙️ صوت بس</option>
+        <option value="link">🔗 روابط بس</option>
+      </select>
+      <button type="button" class="clear-adv" id="clearAdvBtn">✕ مسح الفلاتر</button>
+    </div>
+    <div id="searchCount" class="search-count"></div>
+    <div id="voiceProgressBanner" class="voice-progress-note" style="display:none; margin:0 14px 8px;">
+      <span id="voiceProgressText">بيحلل الرسايل الصوتية...</span>
+      <div class="voice-progress-bar"><div class="voice-progress-fill" id="voiceProgressFill"></div></div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <button id="scrollBottomBtn" class="scroll-bottom-btn" title="النزول لآخر رسالة">⬇</button>
+    <div class="toolbar">
+      <span id="msgCount"></span>
+      <button id="jumpFirstBtn" title="روح لأول رسالة">⏫ أول رسالة</button>
+      <button id="jumpLastBtn" title="روح لآخر رسالة">⏬ آخر رسالة</button>
+      <button id="statsBtn">📊 إحصائيات</button>
+      <button id="loveBtn">💞 تحليل الاهتمام والعلاقة</button>
+      <button id="voiceAnalyzeBtn">🎙️ حلّل الرسايل الصوتية</button>
+      <button id="galleryBtn">🖼️ الصور</button>
+      <button id="starredBtn">⭐ الرسايل المميزة</button>
+      <button id="exportBtn">⬇ تصدير المميزة</button>
+      <button id="exportMediaBtn">🗂️ تحميل الميديا</button>
+      <button id="exportMergedBtn">📦 نسخة متكاملة</button>
+      <button id="pdfBtn">⬇ تنزيل PDF</button>
+      <button id="printBtn">🖨️ طباعة</button>
+      <button id="resetBtn">↩ رفع ملف تاني</button>
+    </div>
+  </div>
+
+  <div id="statsOverlay" class="stats-overlay" style="display:none;">
+    <div class="stats-card">
+      <div class="stats-header">
+        <b>📊 إحصائيات المحادثة</b>
+        <div>
+          <button id="exportStatsImgBtn" title="تصدير كصورة">📤</button>
+          <button id="closeStatsBtn">✕</button>
+        </div>
+      </div>
+      <div id="statsBody"></div>
+    </div>
+  </div>
+
+  <div id="loveOverlay" class="stats-overlay" style="display:none;">
+    <div class="stats-card">
+      <div class="stats-header">
+        <b>💞 تحليل الاهتمام والعلاقة</b>
+        <div>
+          <button id="exportLoveImgBtn" title="تصدير كصورة">📤</button>
+          <button id="closeLoveBtn">✕</button>
+        </div>
+      </div>
+      <div id="loveBody"></div>
+    </div>
+  </div>
+
+  <div id="galleryOverlay" class="gallery-overlay" style="display:none;">
+    <div class="gallery-card">
+      <div class="stats-header">
+        <b>🖼️ ميديا المحادثة</b>
+        <button id="closeGalleryBtn">✕</button>
+      </div>
+      <div class="gallery-tabs" id="galleryTabs">
+        <div class="gallery-tab active" data-type="image">🖼️ صور</div>
+        <div class="gallery-tab" data-type="video">🎬 فيديو</div>
+        <div class="gallery-tab" data-type="audio">🎙️ صوت</div>
+      </div>
+      <div id="galleryGrid" class="gallery-grid"></div>
+    </div>
+  </div>
+
+  <div id="lightbox" class="lightbox" style="display:none;">
+    <button id="closeLightboxBtn" class="lightbox-close">✕</button>
+    <img id="lightboxImg" src="" alt="صورة مكبّرة"/>
+  </div>
+
+  <div id="settingsOverlay" class="stats-overlay" style="display:none;">
+    <div class="settings-card">
+      <div class="stats-header">
+        <b>⚙️ إعدادات المظهر</b>
+        <button id="closeSettingsBtn">✕</button>
+      </div>
+      <div class="settings-section">
+        <span class="settings-label">لون الفقاعات الصادرة</span>
+        <div class="swatches" id="accentSwatches"></div>
+      </div>
+      <div class="settings-section">
+        <span class="settings-label">حجم الخط</span>
+        <div class="font-options" id="fontOptions">
+          <div class="font-option" data-size="small">صغير</div>
+          <div class="font-option" data-size="medium">متوسط</div>
+          <div class="font-option" data-size="large">كبير</div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <span class="settings-label">ترتيب التاريخ في الملف</span>
+        <div class="font-options" id="dateFormatOptions">
+          <div class="font-option" data-fmt="DMY">يوم/شهر</div>
+          <div class="font-option" data-fmt="MDY">شهر/يوم</div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <span class="settings-label">نسخة احتياطية للرسايل المميزة</span>
+        <div class="font-options">
+          <div class="font-option" id="exportStarredBackupBtn">💾 تصدير</div>
+          <label class="font-option" id="importStarredBackupLabel" style="margin:0;">
+            📥 استيراد
+            <input type="file" id="importStarredBackupInput" accept=".json" style="display:none;"/>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script id="mainScript">
+const PRISTINE_HTML = document.documentElement.outerHTML;
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const errorBox = document.getElementById('errorBox');
+const uploadScreen = document.getElementById('uploadScreen');
+const loadingState = document.getElementById('loadingState');
+const loadingLabel = document.getElementById('loadingLabel');
+const loadingSub = document.getElementById('loadingSub');
+const chatScreen = document.getElementById('chatScreen');
+const messagesEl = document.getElementById('messages');
+const chatTitle = document.getElementById('chatTitle');
+const chatSub = document.getElementById('chatSub');
+const msgCount = document.getElementById('msgCount');
+const resetBtn = document.getElementById('resetBtn');
+const starredBtn = document.getElementById('starredBtn');
+const exportBtn = document.getElementById('exportBtn');
+const exportMediaBtn = document.getElementById('exportMediaBtn');
+const exportMergedBtn = document.getElementById('exportMergedBtn');
+const searchInput = document.getElementById('searchInput');
+const senderFilter = document.getElementById('senderFilter');
+const searchCount = document.getElementById('searchCount');
+const statsBtn = document.getElementById('statsBtn');
+const statsOverlay = document.getElementById('statsOverlay');
+const statsBody = document.getElementById('statsBody');
+const closeStatsBtn = document.getElementById('closeStatsBtn');
+const exportStatsImgBtn = document.getElementById('exportStatsImgBtn');
+const loveBtn = document.getElementById('loveBtn');
+const loveOverlay = document.getElementById('loveOverlay');
+const loveBody = document.getElementById('loveBody');
+const closeLoveBtn = document.getElementById('closeLoveBtn');
+const exportLoveImgBtn = document.getElementById('exportLoveImgBtn');
+const themeToggle = document.getElementById('themeToggle');
+const galleryBtn = document.getElementById('galleryBtn');
+const galleryOverlay = document.getElementById('galleryOverlay');
+const galleryGrid = document.getElementById('galleryGrid');
+const closeGalleryBtn = document.getElementById('closeGalleryBtn');
+const printBtn = document.getElementById('printBtn');
+const pdfBtn = document.getElementById('pdfBtn');
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightboxImg');
+const closeLightboxBtn = document.getElementById('closeLightboxBtn');
+const settingsToggle = document.getElementById('settingsToggle');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const accentSwatches = document.getElementById('accentSwatches');
+const fontOptions = document.getElementById('fontOptions');
+const scrollBottomBtn = document.getElementById('scrollBottomBtn');
+const jumpFirstBtn = document.getElementById('jumpFirstBtn');
+const jumpLastBtn = document.getElementById('jumpLastBtn');
+const dateJump = document.getElementById('dateJump');
+const dateFormatOptions = document.getElementById('dateFormatOptions');
+const advToggleBtn = document.getElementById('advToggleBtn');
+const advFilters = document.getElementById('advFilters');
+const dateFromInput = document.getElementById('dateFromInput');
+const dateToInput = document.getElementById('dateToInput');
+const typeFilter = document.getElementById('typeFilter');
+const clearAdvBtn = document.getElementById('clearAdvBtn');
+const exportStarredBackupBtn = document.getElementById('exportStarredBackupBtn');
+const importStarredBackupInput = document.getElementById('importStarredBackupInput');
+const voiceAnalyzeBtn = document.getElementById('voiceAnalyzeBtn');
+const voiceProgressBanner = document.getElementById('voiceProgressBanner');
+const voiceProgressText = document.getElementById('voiceProgressText');
+const voiceProgressFill = document.getElementById('voiceProgressFill');
+
+dateJump.addEventListener('change', ()=>{
+  const day = dateJump.value;
+  dateJump.value = '';
+  if(!day) return;
+  if(showStarredOnly || searchQuery || senderFilterValue || customDateFrom || customDateTo || typeFilterValue){
+    showStarredOnly = false;
+    searchQuery = '';
+    searchInput.value = '';
+    senderFilterValue = '';
+    senderFilter.value = '';
+    customDateFrom = '';
+    customDateTo = '';
+    typeFilterValue = '';
+    dateFromInput.value = '';
+    dateToInput.value = '';
+    typeFilter.value = '';
+    starredBtn.classList.remove('active');
+    starredBtn.textContent = '⭐ الرسايل المميزة';
+    renderMessages();
+  }
+  requestAnimationFrame(()=>{
+    const seps = [...messagesEl.querySelectorAll('.day-sep')];
+    const target = seps.find(s => s.textContent === day);
+    if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+});
+
+messagesEl.addEventListener('scroll', ()=>{
+  const distanceFromBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+  scrollBottomBtn.classList.toggle('show', distanceFromBottom > 300);
+});
+scrollBottomBtn.addEventListener('click', ()=>{
+  messagesEl.scrollTo({top: messagesEl.scrollHeight, behavior:'smooth'});
+});
+
+// Jumps to the first or last message in the currently-filtered view.
+// "start" switches to lightweight head-anchored pagination (loads just one
+// page from the oldest message) instead of rendering the whole chat at once.
+// "end" goes back to the normal tail-anchored view, loading just enough
+// pages to include the very last matching message if a filter is active.
+function jumpToEdge(edge){
+  if(edge === 'start'){
+    viewFromStart = true;
+    currentPage = 1;
+    renderMessages();
+    requestAnimationFrame(()=>{ messagesEl.scrollTo({top: 0, behavior:'smooth'}); });
+  } else {
+    viewFromStart = false;
+    const isFiltered = showStarredOnly || !!searchQuery || !!resolveDateQuery(searchQuery.trim()) || !!senderFilterValue || !!customDateFrom || !!customDateTo || !!typeFilterValue;
+    if(isFiltered){
+      currentPage = Math.max(currentPage, Math.ceil(lastListLength / PAGE_SIZE) || 1);
+    }
+    renderMessages();
+    requestAnimationFrame(()=>{ messagesEl.scrollTo({top: messagesEl.scrollHeight, behavior:'smooth'}); });
+  }
+}
+jumpFirstBtn.addEventListener('click', ()=> jumpToEdge('start'));
+jumpLastBtn.addEventListener('click', ()=> jumpToEdge('end'));
+
+let allMessages = [];
+let starredIds = new Set();
+let showStarredOnly = false;
+let storageKey = 'wa-viewer-starred';
+let searchQuery = '';
+let senderFilterValue = '';
+let mediaMap = {}; // filename (lowercase) -> object URL (for live display)
+let mediaBlobs = {}; // filename (lowercase) -> raw Blob (used to build base64 lazily on export)
+let currentPage = 1;
+let viewFromStart = false; // when true, the normal (non-flat) chat view paginates from the oldest message forward instead of anchoring to the latest — used by the "أول رسالة" button
+let lastListLength = 0; // filtered list length from the most recent render, used to jump straight to the last page without over-loading
+let customDateFrom = '';
+let customDateTo = '';
+let typeFilterValue = '';
+let searchMatchIds = [];
+let searchMatchIndex = 0;
+let dateFormatMode = 'DMY'; // 'DMY' (يوم/شهر) or 'MDY' (شهر/يوم) — how the export file orders its date parts
+const PAGE_SIZE = 60;
+
+function revokeMediaUrls(){
+  Object.values(mediaMap).forEach(url=>{
+    try{ URL.revokeObjectURL(url); }catch(e){}
+  });
+  mediaMap = {};
+  mediaBlobs = {};
+}
+
+function blobToBase64(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function checkEncodingIssues(text){
+  if(!text) return;
+  const sample = text.slice(0, 20000);
+  const badChars = (sample.match(/\uFFFD/g) || []).length;
+  if(sample.length > 200 && badChars / sample.length > 0.01){
+    showTempFileNotice('⚠️ الملف مش شكله UTF-8 سليم — بعض الحروف العربية ممكن تظهر مشوّهة. جرب تفتح الملف بمحرر نصوص وتحفظه بترميز UTF-8 قبل الرفع.');
+  }
+}
+
+function showTempFileNotice(msg){
+  errorBox.innerHTML = `<div class="error-box" style="background:#fff4d6;color:#8b6d1c;">${msg}</div>`;
+  setTimeout(()=>{ if(errorBox.innerHTML.includes(msg)) errorBox.innerHTML = ''; }, 5000);
+}
+
+starredBtn.addEventListener('click', ()=>{
+  showStarredOnly = !showStarredOnly;
+  starredBtn.classList.toggle('active', showStarredOnly);
+  starredBtn.textContent = showStarredOnly ? '⭐ كل الرسايل' : '⭐ الرسايل المميزة';
+  currentPage = 1;
+  viewFromStart = false;
+  renderMessages();
+});
+
+searchInput.addEventListener('input', ()=>{
+  searchQuery = searchInput.value.trim();
+  currentPage = 1;
+  viewFromStart = false;
+  searchMatchIndex = 0;
+  renderMessages();
+});
+
+senderFilter.addEventListener('change', ()=>{
+  senderFilterValue = senderFilter.value;
+  currentPage = 1;
+  viewFromStart = false;
+  renderMessages();
+});
+
+advToggleBtn.addEventListener('click', ()=>{
+  const showing = advFilters.classList.toggle('show');
+  advToggleBtn.classList.toggle('active', showing);
+});
+
+dateFromInput.addEventListener('change', ()=>{
+  customDateFrom = dateFromInput.value;
+  currentPage = 1;
+  viewFromStart = false;
+  renderMessages();
+});
+dateToInput.addEventListener('change', ()=>{
+  customDateTo = dateToInput.value;
+  currentPage = 1;
+  viewFromStart = false;
+  renderMessages();
+});
+typeFilter.addEventListener('change', ()=>{
+  typeFilterValue = typeFilter.value;
+  currentPage = 1;
+  viewFromStart = false;
+  renderMessages();
+});
+clearAdvBtn.addEventListener('click', ()=>{
+  customDateFrom = '';
+  customDateTo = '';
+  typeFilterValue = '';
+  dateFromInput.value = '';
+  dateToInput.value = '';
+  typeFilter.value = '';
+  currentPage = 1;
+  viewFromStart = false;
+  renderMessages();
+});
+
+exportBtn.addEventListener('click', ()=>{
+  const starred = allMessages.filter(m => !m.system && starredIds.has(m.id));
+  if(starred.length === 0){
+    showTempNotice('مفيش رسايل مميزة لسه عشان تصدّرها.');
+    return;
+  }
+  const lines = starred.map(m => `[${m.date}, ${m.time}] ${m.sender}: ${m.content}`);
+  const blob = new Blob([lines.join('\n\n')], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'الرسايل-المميزة.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+exportMergedBtn.addEventListener('click', async ()=>{
+  if(!allMessages.length){
+    showTempNotice('ارفع محادثة الأول قبل ما تصدّرها.');
+    return;
+  }
+  const originalLabel = exportMergedBtn.textContent;
+  exportMergedBtn.disabled = true;
+  exportMergedBtn.textContent = '⏳ بيجهّز...';
+  try{
+    const mediaBase64 = {};
+    const names = Object.keys(mediaBlobs);
+    for(const name of names){
+      const b64 = await blobToBase64(mediaBlobs[name]);
+      mediaBase64[name] = `data:${mediaBlobs[name].type || mimeFor(name)};base64,${b64}`;
+    }
+    const payload = {
+      messages: allMessages.map(m => ({id:m.id, date:m.date, time:m.time, sender:m.sender, content:m.content, system:m.system, transcript:m.transcript, audioStats:m.audioStats})),
+      senders: allMessages.senders || [],
+      primarySender: allMessages.primarySender || '',
+      media: mediaBase64,
+      starred: [...starredIds],
+      title: chatTitle.textContent,
+      sub: chatSub.textContent
+    };
+    const jsonStr = JSON.stringify(payload).replace(/<\/script>/g, '<\\/script>');
+    const injected = `<script>window.__EMBEDDED_CHAT__ = ${jsonStr};<\/script>\n<script id="mainScript">`;
+    const finalHtml = PRISTINE_HTML.replace('<script id="mainScript">', injected);
+    const blob = new Blob([finalHtml], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'شات-متكامل.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(err){
+    console.error(err);
+    showTempNotice('حصل خطأ وإحنا بنجهّز النسخة المتكاملة، جرب تاني.');
+  } finally {
+    exportMergedBtn.disabled = false;
+    exportMergedBtn.textContent = originalLabel;
+  }
+});
+
+statsBtn.addEventListener('click', ()=>{
+  renderStats();
+  statsOverlay.style.display = 'flex';
+});
+closeStatsBtn.addEventListener('click', ()=>{
+  statsOverlay.style.display = 'none';
+});
+statsOverlay.addEventListener('click', (e)=>{
+  if(e.target === statsOverlay) statsOverlay.style.display = 'none';
+});
+exportStatsImgBtn.addEventListener('click', ()=>{
+  exportCardAsImage(document.querySelector('#statsOverlay .stats-card'), 'احصائيات-الشات.png');
+});
+
+loveBtn.addEventListener('click', ()=>{
+  renderLoveAnalysis();
+  loveOverlay.style.display = 'flex';
+});
+closeLoveBtn.addEventListener('click', ()=>{
+  loveOverlay.style.display = 'none';
+});
+loveOverlay.addEventListener('click', (e)=>{
+  if(e.target === loveOverlay) loveOverlay.style.display = 'none';
+});
+exportLoveImgBtn.addEventListener('click', ()=>{
+  exportCardAsImage(document.querySelector('#loveOverlay .stats-card'), 'تحليل-الاهتمام.png');
+});
+
+voiceAnalyzeBtn.addEventListener('click', ()=>{
+  analyzeVoiceMessages();
+});
+
+// Dark mode
+const savedTheme = localStorage.getItem('wa-viewer-theme');
+const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+if(savedTheme === 'dark' || (!savedTheme && prefersDark)){
+  document.body.classList.add('dark');
+  themeToggle.textContent = '☀️';
+}
+themeToggle.addEventListener('click', ()=>{
+  const isDark = document.body.classList.toggle('dark');
+  themeToggle.textContent = isDark ? '☀️' : '🌙';
+  try{ localStorage.setItem('wa-viewer-theme', isDark ? 'dark' : 'light'); }catch(e){}
+});
+
+// Keyboard shortcut: "/" or Ctrl/Cmd+F focuses the search box while a chat is open
+document.addEventListener('keydown', (e)=>{
+  const isSlash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey;
+  const isFindCombo = (e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F');
+  if(!isSlash && !isFindCombo) return;
+  if(chatScreen.style.display === 'none') return;
+  const activeTag = document.activeElement && document.activeElement.tagName;
+  if(isSlash && (activeTag === 'INPUT' || activeTag === 'TEXTAREA')) return;
+  e.preventDefault();
+  searchInput.focus();
+  searchInput.select();
+});
+
+// Appearance settings: accent color + font size
+const ACCENTS = [
+  {name:'أخضر (الأصلي)', out:'#d9fdd3', accent:'#00a884', dark:'#005c4b'},
+  {name:'أزرق', out:'#d7e8ff', accent:'#3b82f6', dark:'#1d4ed8'},
+  {name:'وردي', out:'#ffdcf1', accent:'#ec4899', dark:'#be185d'},
+  {name:'بنفسجي', out:'#e8ddff', accent:'#8b5cf6', dark:'#6d28d9'},
+  {name:'برتقالي', out:'#ffe4c7', accent:'#f97316', dark:'#c2410c'}
+];
+const FONT_SIZES = {small:'12.8px', medium:'14.2px', large:'16px'};
+
+function loadSettings(){
+  try{
+    return JSON.parse(localStorage.getItem('wa-viewer-settings')) || {accent:0, fontSize:'medium'};
+  }catch(e){ return {accent:0, fontSize:'medium'}; }
+}
+function saveSettings(s){
+  try{ localStorage.setItem('wa-viewer-settings', JSON.stringify(s)); }catch(e){}
+}
+function applySettings(s){
+  const a = ACCENTS[s.accent] || ACCENTS[0];
+  document.documentElement.style.setProperty('--wa-green', a.accent);
+  document.documentElement.style.setProperty('--wa-green-dark', a.dark);
+  document.documentElement.style.setProperty('--wa-out', a.out);
+  document.documentElement.style.setProperty('--wa-font-size', FONT_SIZES[s.fontSize] || FONT_SIZES.medium);
+}
+
+let appearance = loadSettings();
+
+accentSwatches.innerHTML = ACCENTS.map((a,i)=>
+  `<div class="swatch${i===appearance.accent?' active':''}" data-idx="${i}" style="background:${a.accent}" title="${a.name}"></div>`
+).join('');
+[...fontOptions.children].forEach(opt=>{
+  opt.classList.toggle('active', opt.dataset.size === appearance.fontSize);
+});
+
+accentSwatches.addEventListener('click', (e)=>{
+  const sw = e.target.closest('.swatch');
+  if(!sw) return;
+  appearance.accent = parseInt(sw.dataset.idx, 10);
+  saveSettings(appearance);
+  applySettings(appearance);
+  [...accentSwatches.children].forEach(c=>c.classList.remove('active'));
+  sw.classList.add('active');
+});
+fontOptions.addEventListener('click', (e)=>{
+  const opt = e.target.closest('.font-option');
+  if(!opt) return;
+  appearance.fontSize = opt.dataset.size;
+  saveSettings(appearance);
+  applySettings(appearance);
+  [...fontOptions.children].forEach(c=>c.classList.remove('active'));
+  opt.classList.add('active');
+});
+
+settingsToggle.addEventListener('click', ()=>{ settingsOverlay.style.display = 'flex'; });
+closeSettingsBtn.addEventListener('click', ()=>{ settingsOverlay.style.display = 'none'; });
+settingsOverlay.addEventListener('click', (e)=>{
+  if(e.target === settingsOverlay) settingsOverlay.style.display = 'none';
+});
+
+function updateDateFormatUI(){
+  [...dateFormatOptions.children].forEach(opt=>{
+    opt.classList.toggle('active', opt.dataset.fmt === dateFormatMode);
+  });
+}
+dateFormatOptions.addEventListener('click', (e)=>{
+  const opt = e.target.closest('.font-option');
+  if(!opt || !opt.dataset.fmt) return;
+  dateFormatMode = opt.dataset.fmt;
+  updateDateFormatUI();
+  if(allMessages.length){
+    allMessages.forEach(m=>{
+      m.dateObj = parseWaDate(m.date);
+      m.timestamp = combineDateTime(m.dateObj, parseWaTime(m.time));
+    });
+    const uniqueDates = [...new Set(allMessages.map(m=>m.date))];
+    dateJump.innerHTML = '<option value="">📅 التاريخ</option>' +
+      uniqueDates.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+    renderMessages();
+  }
+});
+
+exportStarredBackupBtn.addEventListener('click', ()=>{
+  if(!allMessages.length){
+    showTempNotice('ارفع محادثة الأول قبل ما تعمل نسخة احتياطية.');
+    return;
+  }
+  const payload = { storageKey, starred: [...starredIds], chatTitle: chatTitle.textContent, count: starredIds.size };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'نسخة-احتياطية-مميزة.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+importStarredBackupInput.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!Array.isArray(data.starred)){
+      showTempNotice('ملف النسخة الاحتياطية مش بالشكل المتوقع.');
+      return;
+    }
+    if(data.storageKey && data.storageKey !== storageKey){
+      showTempNotice('النسخة الاحتياطية دي من محادثة تانية — اتأكد إنك رافع نفس المحادثة.');
+      return;
+    }
+    data.starred.forEach(id => starredIds.add(id));
+    saveStarred();
+    renderMessages();
+    showTempNotice(`تم استيراد ${data.starred.length} رسالة مميزة.`);
+  } catch(err){
+    console.error(err);
+    showTempNotice('تعذر قراءة ملف النسخة الاحتياطية.');
+  }
+});
+
+applySettings(appearance);
+
+// Gallery
+const galleryTabs = document.getElementById('galleryTabs');
+let galleryType = 'image';
+
+galleryBtn.addEventListener('click', ()=>{
+  renderGallery();
+  galleryOverlay.style.display = 'flex';
+});
+closeGalleryBtn.addEventListener('click', ()=>{
+  galleryOverlay.style.display = 'none';
+});
+galleryOverlay.addEventListener('click', (e)=>{
+  if(e.target === galleryOverlay) galleryOverlay.style.display = 'none';
+});
+galleryTabs.addEventListener('click', (e)=>{
+  const tab = e.target.closest('.gallery-tab');
+  if(!tab) return;
+  galleryType = tab.dataset.type;
+  [...galleryTabs.children].forEach(c=>c.classList.remove('active'));
+  tab.classList.add('active');
+  renderGallery();
+});
+
+function jumpToMessage(id){
+  galleryOverlay.style.display = 'none';
+  showStarredOnly = false;
+  searchQuery = '';
+  searchInput.value = '';
+  senderFilterValue = '';
+  senderFilter.value = '';
+  starredBtn.classList.remove('active');
+  starredBtn.textContent = '⭐ الرسايل المميزة';
+  renderMessages();
+  requestAnimationFrame(()=>{
+    const target = messagesEl.querySelector(`[data-msg-id="${id}"]`);
+    if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+}
+
+function renderGallery(){
+  const typeCheck = galleryType === 'image' ? isImageFile : (galleryType === 'video' ? isVideoFile : isAudioFile);
+  const msgs = allMessages.filter(m=>{
+    if(m.system) return false;
+    const a = extractAttachment(m.content);
+    return a && typeCheck(a) && mediaMap[a.toLowerCase()];
+  });
+  galleryGrid.innerHTML = '';
+  if(msgs.length === 0){
+    const label = galleryType === 'image' ? 'صور' : (galleryType === 'video' ? 'فيديوهات' : 'رسايل صوتية');
+    galleryGrid.innerHTML = `<div class="gallery-empty">مفيش ${label} في المحادثة دي (تأكد إنك رفعت الـ zip بالميديا).</div>`;
+    return;
+  }
+  msgs.forEach(m=>{
+    const a = extractAttachment(m.content);
+    const src = mediaMap[a.toLowerCase()];
+    let el;
+    if(galleryType === 'image'){
+      el = document.createElement('img');
+      el.className = 'gallery-thumb';
+      el.src = src;
+    } else if(galleryType === 'video'){
+      el = document.createElement('div');
+      el.className = 'gallery-video-thumb';
+      el.textContent = '▶️';
+    } else {
+      el = document.createElement('div');
+      el.className = 'gallery-audio-thumb';
+      el.textContent = '🎙️';
+    }
+    el.addEventListener('click', ()=> jumpToMessage(m.id));
+    galleryGrid.appendChild(el);
+  });
+}
+
+// Print / PDF
+printBtn.addEventListener('click', ()=>{
+  window.print();
+});
+
+async function exportCardAsImage(cardEl, filename){
+  if(!cardEl) return;
+  if(typeof html2canvas === 'undefined'){
+    showTempNotice('تعذر تحميل أداة التصدير — تأكد إنك متصل بالإنترنت وجرب تاني.');
+    return;
+  }
+  const clone = cardEl.cloneNode(true);
+  clone.style.maxHeight = 'none';
+  clone.style.overflow = 'visible';
+  clone.style.position = 'fixed';
+  clone.style.left = '-9999px';
+  clone.style.top = '0';
+  clone.style.width = cardEl.offsetWidth + 'px';
+  document.body.appendChild(clone);
+  try{
+    const isDark = document.body.classList.contains('dark');
+    const canvas = await html2canvas(clone, { scale: 2, useCORS: true, backgroundColor: isDark ? '#202c33' : '#ffffff' });
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(err){
+    console.error(err);
+    showTempNotice('حصل خطأ في تصدير الصورة، جرب تاني.');
+  } finally {
+    if(clone.parentNode) clone.parentNode.removeChild(clone);
+  }
+}
+
+pdfBtn.addEventListener('click', async ()=>{
+  if(typeof html2pdf === 'undefined'){
+    showTempNotice('تعذر تحميل أداة الـ PDF — تأكد إنك متصل بالإنترنت وجرب تاني.');
+    return;
+  }
+  const originalLabel = pdfBtn.textContent;
+  pdfBtn.disabled = true;
+  pdfBtn.textContent = '⏳ بيجهّز...';
+  let clone = null;
+  try{
+    clone = document.getElementById('app').cloneNode(true);
+    clone.querySelectorAll('.filter-bar, .adv-filters, .toolbar, .scroll-bottom-btn, #searchCount, .star-btn, .copy-btn, #uploadScreen, .theme-toggle, .settings-toggle').forEach(el => el.remove());
+    const clonedMessages = clone.querySelector('.messages');
+    if(clonedMessages) clonedMessages.style.overflow = 'visible';
+    clone.style.position = 'fixed';
+    clone.style.left = '-9999px';
+    clone.style.top = '0';
+    clone.style.maxWidth = '650px';
+    clone.style.minHeight = '0';
+    document.body.appendChild(clone);
+
+    await html2pdf().set({
+      margin: 8,
+      filename: 'شات-واتساب.pdf',
+      image: { type: 'jpeg', quality: 0.92 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    }).from(clone).save();
+  } catch(err){
+    console.error(err);
+    showTempNotice('حصل خطأ في تجهيز الـ PDF، جرب تاني.');
+  } finally {
+    if(clone && clone.parentNode) clone.parentNode.removeChild(clone);
+    pdfBtn.disabled = false;
+    pdfBtn.textContent = originalLabel;
+  }
+});
+
+exportMediaBtn.addEventListener('click', async ()=>{
+  const names = Object.keys(mediaBlobs);
+  if(names.length === 0){
+    showTempNotice('مفيش ميديا محمّلة في المحادثة دي (لازم ترفع ملف الـ zip بالميديا).');
+    return;
+  }
+  const originalLabel = exportMediaBtn.textContent;
+  exportMediaBtn.disabled = true;
+  exportMediaBtn.textContent = '⏳ بيجهّز...';
+  try{
+    const zip = new JSZip();
+    names.forEach(name => zip.file(name, mediaBlobs[name]));
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ميديا-المحادثة.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(err){
+    console.error(err);
+    showTempNotice('حصل خطأ في تجهيز ملف الميديا، جرب تاني.');
+  } finally {
+    exportMediaBtn.disabled = false;
+    exportMediaBtn.textContent = originalLabel;
+  }
+});
+
+// Lightbox
+function openLightbox(src){
+  lightboxImg.src = src;
+  lightbox.style.display = 'flex';
+}
+closeLightboxBtn.addEventListener('click', ()=>{ lightbox.style.display = 'none'; });
+lightbox.addEventListener('click', (e)=>{
+  if(e.target === lightbox) lightbox.style.display = 'none';
+});
+
+function renderStats(){
+  const real = allMessages.filter(m => !m.system);
+  const perSender = {};
+  let imgCount = 0, vidCount = 0, audioCount = 0;
+  const perDay = {};
+  const perHour = {};
+
+  real.forEach(m=>{
+    perSender[m.sender] = (perSender[m.sender] || 0) + 1;
+    perDay[m.date] = (perDay[m.date] || 0) + 1;
+    const hourSource = m.timestamp || combineDateTime(m.dateObj, parseWaTime(m.time));
+    if(hourSource){
+      const h = hourSource.getHours();
+      perHour[h] = (perHour[h] || 0) + 1;
+    }
+    const attach = extractAttachment(m.content);
+    if(attach){
+      if(isImageFile(attach)) imgCount++;
+      else if(isVideoFile(attach)) vidCount++;
+      else if(isAudioFile(attach)) audioCount++;
+    }
+  });
+
+  const senderRows = Object.entries(perSender)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([name,count])=>`<div class="stat-row"><span>${escapeHtml(name)}</span><b>${count}</b></div>`)
+    .join('');
+
+  let busiestDay = null, busiestCount = 0;
+  Object.entries(perDay).forEach(([day,count])=>{
+    if(count > busiestCount){ busiestCount = count; busiestDay = day; }
+  });
+
+  let busiestHour = null, busiestHourCount = 0;
+  Object.entries(perHour).forEach(([h,count])=>{
+    if(count > busiestHourCount){ busiestHourCount = count; busiestHour = parseInt(h,10); }
+  });
+  const busiestHourLabel = busiestHour === null ? '—' : formatHourLabel(busiestHour) + ' (' + busiestHourCount + ')';
+
+  const replyTimes = computeAvgReplyTimes();
+  let replySection = '';
+  if(replyTimes){
+    const rows = Object.entries(replyTimes)
+      .map(([name,ms])=>`<div class="stat-row"><span>${escapeHtml(name)}</span><b>${ms==null ? '—' : formatDuration(ms)}</b></div>`)
+      .join('');
+    replySection = `
+    <div class="stat-section-title">متوسط وقت الرد</div>
+    ${rows}`;
+  }
+
+  const topEmojis = computeTopEmojis(real);
+  const topWords = computeTopWords(real, 8);
+  const topEmojisRow = topEmojis.length
+    ? `<div class="stat-row"><span>${topEmojis.map(([e,c])=>`${e} ×${c}`).join('  ')}</span></div>`
+    : '<div class="stat-row"><span>لا يوجد بيانات</span></div>';
+  const topWordsRow = topWords.length
+    ? topWords.map(w => `
+      <div class="mini-bar-row">
+        <span class="mini-bar-label" style="width:70px;">${escapeHtml(w.word)}</span>
+        <span class="mini-bar-track"><span class="mini-bar-fill" style="width:${w.pct}%;"></span></span>
+        <span class="mini-bar-count" style="width:44px;">${w.pct}٪ (${w.count})</span>
+      </div>`).join('')
+    : '<div class="stat-row"><span>لا يوجد بيانات</span></div>';
+
+  const callStats = computeCallStats();
+  let callSection = '';
+  if(callStats){
+    callSection = `
+    <div class="stat-section-title">المكالمات</div>
+    <div class="stat-row"><span>📞 مكالمات صوتية</span><b>${callStats.voice}</b></div>
+    <div class="stat-row"><span>📹 مكالمات فيديو</span><b>${callStats.video}</b></div>
+    <div class="stat-row"><span>❌ مكالمات فايتة</span><b>${callStats.missed}</b></div>
+    ${callStats.avgDurationMs ? `<div class="stat-row"><span>متوسط مدة المكالمة</span><b>${formatDuration(callStats.avgDurationMs)}</b></div>` : ''}`;
+  }
+
+  const months = getAvailableMonths();
+  let compareSection = '';
+  if(months.length >= 2){
+    const optsA = months.map((k,i)=>`<option value="${k}" ${i===0?'selected':''}>${monthKeyLabel(k)}</option>`).join('');
+    const optsB = months.map((k,i)=>`<option value="${k}" ${i===months.length-1?'selected':''}>${monthKeyLabel(k)}</option>`).join('');
+    compareSection = `
+    <div class="stat-section-title">مقارنة بين فترتين</div>
+    <div class="compare-row">
+      <select id="compareMonthA">${optsA}</select>
+      <span>مقابل</span>
+      <select id="compareMonthB">${optsB}</select>
+    </div>
+    <button type="button" id="compareMonthsBtn" class="compare-btn">قارن</button>
+    <div id="compareResult"></div>`;
+  }
+
+  statsBody.innerHTML = `
+    <div class="stat-section-title">عدد الرسايل لكل شخص</div>
+    ${senderRows || '<div class="stat-row"><span>لا يوجد بيانات</span></div>'}
+
+    <div class="stat-section-title">إجمالي</div>
+    <div class="stat-row"><span>إجمالي الرسايل</span><b>${real.length}</b></div>
+    <div class="stat-row"><span>الرسايل المميزة</span><b>${starredIds.size}</b></div>
+    <div class="stat-row"><span>أكتر يوم فيه رسايل</span><b>${busiestDay ? escapeHtml(busiestDay) + ' (' + busiestCount + ')' : '—'}</b></div>
+    <div class="stat-row"><span>أكتر ساعة فيها رسايل</span><b>${busiestHourLabel}</b></div>
+    ${replySection}
+    <div class="stat-section-title">الوسائط</div>
+    <div class="stat-row"><span>🖼️ صور</span><b>${imgCount}</b></div>
+    <div class="stat-row"><span>🎬 فيديوهات</span><b>${vidCount}</b></div>
+    <div class="stat-row"><span>🎙️ رسايل صوتية</span><b>${audioCount}</b></div>
+    ${callSection}
+
+    <div class="stat-section-title">أكتر 5 إيموجي</div>
+    ${topEmojisRow}
+
+    <div class="stat-section-title">أكتر الكلمات استخدامًا (بالنسبة)</div>
+    ${topWordsRow}
+
+    <div class="stat-section-title">النشاط عبر الأيام</div>
+    <canvas id="activityChart" width="290" height="110" style="width:100%;height:auto;"></canvas>
+
+    <div class="stat-section-title">النشاط عبر ساعات اليوم</div>
+    <canvas id="hourlyChart" width="290" height="100" style="width:100%;height:auto;"></canvas>
+    ${compareSection}
+  `;
+
+  drawActivityChart(perDay);
+  drawHourlyChart(perHour);
+
+  const compareBtn = document.getElementById('compareMonthsBtn');
+  if(compareBtn){
+    compareBtn.addEventListener('click', ()=>{
+      const keyA = document.getElementById('compareMonthA').value;
+      const keyB = document.getElementById('compareMonthB').value;
+      const a = computeMonthStats(keyA);
+      const b = computeMonthStats(keyB);
+      const senderNames = Array.from(new Set([...Object.keys(a.perSender), ...Object.keys(b.perSender)]));
+      const senderRowsHtml = senderNames.map(name=>`
+        <div class="stat-row"><span>${escapeHtml(name)}</span><b>${a.perSender[name]||0} ⇄ ${b.perSender[name]||0}</b></div>`).join('');
+      document.getElementById('compareResult').innerHTML = `
+        <div class="compare-header"><span>${monthKeyLabel(keyA)}</span><span>${monthKeyLabel(keyB)}</span></div>
+        <div class="stat-row"><span>إجمالي الرسايل</span><b>${a.count} ⇄ ${b.count}</b></div>
+        <div class="stat-row"><span>متوسط طول الرسالة</span><b>${a.avgLen} ⇄ ${b.avgLen} حرف</b></div>
+        ${senderRowsHtml}
+      `;
+    });
+  }
+}
+
+function formatHourLabel(h){
+  const period = h < 12 ? 'ص' : 'م';
+  let h12 = h % 12;
+  if(h12 === 0) h12 = 12;
+  return `${h12}:00 ${period}`;
+}
+
+function computeTopEmojis(messages){
+  const emojiRegex = /\p{Extended_Pictographic}/gu;
+  const counts = {};
+  messages.forEach(m=>{
+    const text = effectiveText(m);
+    if(!text) return;
+    const matches = text.match(emojiRegex);
+    if(matches) matches.forEach(e=>{ counts[e] = (counts[e] || 0) + 1; });
+  });
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+}
+
+const STAT_STOP_WORDS = new Set(['في','من','على','إلى','الى','عن','مع','هو','هي','انا','أنا','انت','أنت','إنت','ايه','إيه','ازيك','ازاي','لا','ما','او','أو','كل','دي','ده','هذا','هذه','عشان','علشان','بس','يعني','كان','كانت','the','and','you','that','this','for','are','was','not','with','have','this','your']);
+
+function computeTopWords(messages, limit){
+  const counts = {};
+  let total = 0;
+  messages.forEach(m=>{
+    const text = effectiveText(m);
+    if(!text) return;
+    const words = text
+      .replace(/\p{Extended_Pictographic}/gu, ' ')
+      .split(/[\s.,!?؛،:؟"'()\[\]{}\n]+/u)
+      .map(w => w.trim().toLowerCase())
+      .filter(w => w.length >= 3 && !STAT_STOP_WORDS.has(w) && !/^\d+$/.test(w));
+    words.forEach(w => { counts[w] = (counts[w] || 0) + 1; total++; });
+  });
+  return Object.entries(counts)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0, limit || 5)
+    .map(([word,count]) => ({ word, count, pct: total ? Math.round(count/total*100) : 0 }));
+}
+
+function drawActivityChart(perDay){
+  const canvas = document.getElementById('activityChart');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const isDark = document.body.classList.contains('dark');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+
+  let entries = Object.entries(perDay);
+  if(entries.length === 0) return;
+
+  // Bucket by month if too many distinct days, to keep the chart readable
+  if(entries.length > 40){
+    const perMonth = {};
+    entries.forEach(([day,count])=>{
+      const p = day.split('/');
+      const key = p.length === 3 ? `${p[1]}/${p[2]}` : day;
+      perMonth[key] = (perMonth[key] || 0) + count;
+    });
+    entries = Object.entries(perMonth);
+  }
+
+  const max = Math.max(...entries.map(e=>e[1]));
+  const padding = 6;
+  const barGap = 2;
+  const barW = Math.max(2, (w - padding*2) / entries.length - barGap);
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--wa-green').trim() || '#00a884';
+
+  ctx.fillStyle = isDark ? '#8696a0' : '#667781';
+  ctx.font = '9px sans-serif';
+
+  entries.forEach(([label,count], i)=>{
+    const barH = (count / max) * (h - 20);
+    const x = padding + i * (barW + barGap);
+    const y = h - barH - 14;
+    ctx.fillStyle = accent;
+    ctx.fillRect(x, y, barW, barH);
+  });
+
+  // Label first and last bucket only, to avoid clutter
+  ctx.fillStyle = isDark ? '#8696a0' : '#667781';
+  if(entries[0]) ctx.fillText(entries[0][0], padding, h - 2);
+  if(entries.length > 1){
+    const lastLabel = entries[entries.length-1][0];
+    const textW = ctx.measureText(lastLabel).width;
+    ctx.fillText(lastLabel, w - padding - textW, h - 2);
+  }
+}
+
+function drawHourlyChart(perHour){
+  const canvas = document.getElementById('hourlyChart');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const isDark = document.body.classList.contains('dark');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+
+  const hours = Array.from({length:24}, (_,i) => perHour[i] || 0);
+  const max = Math.max(...hours, 1);
+  const padding = 6;
+  const barGap = 1.5;
+  const barW = (w - padding*2) / 24 - barGap;
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--wa-green').trim() || '#00a884';
+
+  hours.forEach((count, h24)=>{
+    const barH = (count / max) * (h - 16);
+    const x = padding + h24 * (barW + barGap);
+    const y = h - barH - 12;
+    ctx.fillStyle = accent;
+    ctx.fillRect(x, y, barW, barH);
+  });
+
+  ctx.fillStyle = isDark ? '#8696a0' : '#667781';
+  ctx.font = '8px sans-serif';
+  ctx.fillText('12ص', padding, h - 2);
+  ctx.fillText('12م', w/2 - 8, h - 2);
+  const lastLabel = '11م';
+  ctx.fillText(lastLabel, w - padding - ctx.measureText(lastLabel).width, h - 2);
+}
+
+const CALL_REGEX = /(مكالمة\s*صوتية|مكالمة\s*فيديو|voice call|video call)/i;
+const CALL_MISSED_REGEX = /(فائتة|missed)/i;
+const CALL_DURATION_REGEX = /(\d{1,2}:\d{2}(?::\d{2})?)/;
+
+// Heuristic call-log detection: WhatsApp's plain-text export sometimes
+// includes call events as regular lines (system or attributed to a
+// sender). Not all exports include this — if none are found, the section
+// is simply omitted.
+function computeCallStats(){
+  let voice = 0, video = 0, missed = 0, totalDurationMs = 0, withDuration = 0;
+  allMessages.forEach(m=>{
+    if(!m.content || !CALL_REGEX.test(m.content)) return;
+    const isVideo = /فيديو|video/i.test(m.content);
+    const isMissed = CALL_MISSED_REGEX.test(m.content);
+    if(isMissed) missed++;
+    else if(isVideo) video++;
+    else voice++;
+    const durMatch = m.content.match(CALL_DURATION_REGEX);
+    if(durMatch && !isMissed){
+      const parts = durMatch[1].split(':').map(Number);
+      const ms = parts.length === 3
+        ? (parts[0]*3600 + parts[1]*60 + parts[2]) * 1000
+        : (parts[0]*60 + parts[1]) * 1000;
+      totalDurationMs += ms;
+      withDuration++;
+    }
+  });
+  const total = voice + video + missed;
+  if(total === 0) return null;
+  return { voice, video, missed, total, avgDurationMs: withDuration ? totalDurationMs/withDuration : null };
+}
+
+const MONTH_LABELS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+function getAvailableMonths(){
+  const set = new Set();
+  allMessages.forEach(m=>{
+    if(m.system || !m.dateObj) return;
+    set.add(m.dateObj.getFullYear() + '-' + String(m.dateObj.getMonth()+1).padStart(2,'0'));
+  });
+  return Array.from(set).sort();
+}
+
+function monthKeyLabel(key){
+  const [y,m] = key.split('-');
+  return MONTH_LABELS_AR[parseInt(m,10)-1] + ' ' + y;
+}
+
+function computeMonthStats(key){
+  const [y,m] = key.split('-').map(Number);
+  const real = allMessages.filter(msg => !msg.system && msg.dateObj && msg.dateObj.getFullYear()===y && msg.dateObj.getMonth()===m-1);
+  const perSender = {};
+  real.forEach(msg=>{ perSender[msg.sender] = (perSender[msg.sender]||0)+1; });
+  const totalChars = real.reduce((a,msg)=> a + (extractAttachment(msg.content) ? 0 : msg.content.length), 0);
+  return {
+    count: real.length,
+    avgLen: real.length ? Math.round(totalChars/real.length) : 0,
+    perSender
+  };
+}
+
+function computeAvgReplyTimes(){
+  const senders = allMessages.senders || [];
+  if(senders.length !== 2) return null;
+  const real = allMessages.filter(m => !m.system && m.timestamp);
+  if(real.length < 2) return null;
+
+  const totals = {};
+  senders.forEach(s => totals[s] = {sum:0, count:0});
+
+  for(let i=1;i<real.length;i++){
+    const prev = real[i-1], cur = real[i];
+    if(cur.sender !== prev.sender && totals[cur.sender]){
+      const gapMs = cur.timestamp - prev.timestamp;
+      if(gapMs > 0 && gapMs < 1000*60*60*24*2){ // ignore >2 day gaps, likely not a "reply"
+        totals[cur.sender].sum += gapMs;
+        totals[cur.sender].count++;
+      }
+    }
+  }
+
+  const result = {};
+  senders.forEach(s=>{
+    result[s] = totals[s].count ? totals[s].sum / totals[s].count : null;
+  });
+  return result;
+}
+
+function formatDuration(ms){
+  const mins = ms / 60000;
+  if(mins < 1) return 'أقل من دقيقة';
+  if(mins < 60) return Math.round(mins) + ' دقيقة';
+  const hours = mins / 60;
+  if(hours < 24) return (Math.round(hours*10)/10) + ' ساعة';
+  const days = hours / 24;
+  return (Math.round(days*10)/10) + ' يوم';
+}
+
+// ---------------------------------------------------------------------
+// "تحليل الاهتمام والعلاقة" — a heuristic, statistics-only estimate built
+// purely from message patterns (reply speed, who starts chats, question
+// rate, emoji use, message length). It is NOT a psychological assessment
+// of real people; it just summarizes patterns already visible in the chat.
+// Only meaningful for exactly two participants.
+// ---------------------------------------------------------------------
+const ROMANTIC_EMOJI = /[❤️❤💕💖💗💘💝💞😍🥰😘😻💓💜🧡💛💚💙🤍🖤💋😊🥺]/gu;
+
+// Small Egyptian-dialect keyword lists for a rough, non-scientific tone read.
+// These are heuristics only — they miss sarcasm/context and are meant as a
+// general indicator, not a verdict.
+const POSITIVE_WORDS = ['بحبك','بحب','حبيبي','حبيبتي','حلو','حلوة','جميل','جميلة','رائع','رائعة','تمام','ممتاز','مبسوط','مبسوطة','فرحان','فرحانة','سعيد','سعيدة','احلى','أحلى','عسل','قمر','يجنن','جامد','جامدة','برافو','ميرسي','شكرا','شكراً','الحمدلله','مشتاق','مشتاقة','واحشني','واحشتيني','ولا اروع','تحفة','فرحة','مبروك','كفو','ظريف','ظريفة','لطيف','لطيفة','يهبل'];
+const NEGATIVE_WORDS = ['زعلان','زعلانة','متضايق','متضايقة','تعبان','تعبانة','وحش','وحشة','غلط','مشكلة','خناقة','متخانقين','بكره','قرفان','قرفانة','مضايقني','مضايقة','مستحيل','سيبيني','سيبني','خايف','خايفة','قلقان','قلقانة','مزعج','مزعجة','مكتئب','حزين','حزينة','متعصب','متعصبة','غاضب','غاضبة','زهقان','زهقانة','مش قادر','مش قادرة'];
+const ANGER_WORDS = ['غاضب','غاضبة','عصبي','عصبية','متعصب','متعصبة','نرفزة','نرفزت','مقرف','مقرفة','زهقت منك','خلاص بقى','بجد زهقت','متضايق منك','مش لاقي كلام','فاض بيا الكيل','مش قادر أستحمل','مش قادرة أستحمل','هبله','احمق','غبي','غبية','يلعن','هعصب','عصبتني','استفزاز','مستفز','مستفزة'];
+const APOLOGY_WORDS = ['معلش','معلشي','آسف','اسف','آسفة','اسفة','سوري','خلاص','مش قصدي','سامحني','سامحيني','اعذرني','اعذريني','هعوض','بعتذر','عادي كده'];
+const NICKNAME_WORDS = ['حبيبي','حبيبتي','حبيبى','حبيبتى','يا قمر','يا عسل','يا روحي','يا حياتي','يا عمري','يا فندم','يا كبير','يا كبيرة','يا حلو','يا حلوة','يا جميل','يا جميلة','يا نور عيني','يا غالي','يا غالية','يا وحشني','يا وحشتيني'];
+
+function computeNicknameUsage(real, senders){
+  const perSender = {}; senders.forEach(s=> perSender[s] = {hits:0, total:0});
+  real.forEach(m=>{
+    const text = effectiveText(m);
+    if(!text) return;
+    const s = perSender[m.sender];
+    if(!s) return;
+    s.total++;
+    if(countKeywordHits(text, NICKNAME_WORDS) > 0 || /يا\s+[\u0600-\u06FF]{2,}/.test(text)) s.hits++;
+  });
+  return senders.map(s=>{
+    const d = perSender[s];
+    return { sender:s, pct: d.total ? Math.round(d.hits/d.total*100) : 0, hits: d.hits };
+  });
+}
+
+const WEEKDAY_LABELS_AR = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const CONVO_GAP_MS = 1000*60*60*3; // same "new conversation" threshold used in love metrics
+
+function countKeywordHits(content, list){
+  const low = content.toLowerCase();
+  let n = 0;
+  list.forEach(w=>{ if(low.includes(w)) n++; });
+  return n;
+}
+
+// Splits the timeline into "conversations" (gap >= CONVO_GAP_MS starts a new
+// one) and returns, for each conversation, who sent its last message —
+// i.e. who tends to leave the chat hanging / have the last word.
+function computeConversationClosers(real, senders){
+  if(!real.length) return null;
+  const closerCounts = {}; senders.forEach(s=>closerCounts[s]=0);
+  let lastMsg = null;
+  real.forEach(m=>{
+    if(lastMsg && (m.timestamp - lastMsg.timestamp) >= CONVO_GAP_MS){
+      if(closerCounts[lastMsg.sender] !== undefined) closerCounts[lastMsg.sender]++;
+    }
+    lastMsg = m;
+  });
+  if(lastMsg && closerCounts[lastMsg.sender] !== undefined) closerCounts[lastMsg.sender]++;
+  const total = Object.values(closerCounts).reduce((a,b)=>a+b,0) || 1;
+  return senders.map(s=>({ sender:s, count:closerCounts[s], pct: Math.round(closerCounts[s]/total*100) }));
+}
+
+// Buckets messages by week and flags weeks where the volume jumps or drops
+// sharply vs the previous week (only weeks with meaningful volume count).
+function computeTurningPoints(real){
+  if(real.length < 20) return [];
+  const weekly = {};
+  real.forEach(m=>{
+    const d = new Date(m.timestamp);
+    const day = d.getDay();
+    const weekStart = new Date(d); weekStart.setDate(d.getDate() - day); weekStart.setHours(0,0,0,0);
+    const key = weekStart.getTime();
+    weekly[key] = (weekly[key] || 0) + 1;
+  });
+  const weeks = Object.entries(weekly).map(([k,c])=>({t:parseInt(k,10), count:c})).sort((a,b)=>a.t-b.t);
+  const points = [];
+  for(let i=1;i<weeks.length;i++){
+    const prev = weeks[i-1], cur = weeks[i];
+    if(prev.count < 3 && cur.count < 3) continue;
+    const base = Math.max(prev.count, 1);
+    const change = (cur.count - prev.count) / base;
+    if(Math.abs(change) >= 0.8){
+      points.push({
+        date: new Date(cur.t),
+        direction: change > 0 ? 'up' : 'down',
+        pct: Math.round(Math.abs(change)*100),
+        from: prev.count, to: cur.count
+      });
+    }
+  }
+  points.sort((a,b)=> b.pct - a.pct);
+  return points.slice(0,4).sort((a,b)=> a.date - b.date);
+}
+
+function computeWeekdayBreakdown(real){
+  const counts = new Array(7).fill(0);
+  real.forEach(m=>{ counts[new Date(m.timestamp).getDay()]++; });
+  const max = Math.max(...counts, 1);
+  return counts.map((c,i)=>({ label: WEEKDAY_LABELS_AR[i], count:c, pct: Math.round(c/max*100) }));
+}
+
+function computeSentiment(real, senders){
+  const perSender = {};
+  senders.forEach(s=> perSender[s] = { pos:0, neg:0, anger:0, total:0 });
+  real.forEach(m=>{
+    const text = effectiveText(m);
+    if(!text) return;
+    const s = perSender[m.sender];
+    if(!s) return;
+    s.total++;
+    if(countKeywordHits(text, POSITIVE_WORDS) > 0) s.pos++;
+    if(countKeywordHits(text, NEGATIVE_WORDS) > 0) s.neg++;
+    if(countKeywordHits(text, ANGER_WORDS) > 0 || /!{2,}|؟{2,}/.test(text)) s.anger++;
+  });
+  return senders.map(s=>{
+    const d = perSender[s];
+    return {
+      sender:s,
+      posPct: d.total ? Math.round(d.pos/d.total*100) : 0,
+      negPct: d.total ? Math.round(d.neg/d.total*100) : 0,
+      angerPct: d.total ? Math.round(d.anger/d.total*100) : 0
+    };
+  });
+}
+
+function computeConflictWords(real, senders){
+  const perSender = {}; senders.forEach(s=> perSender[s] = 0);
+  let total = 0;
+  real.forEach(m=>{
+    const text = effectiveText(m);
+    if(!text) return;
+    if(countKeywordHits(text, APOLOGY_WORDS) > 0){
+      total++;
+      if(perSender[m.sender] !== undefined) perSender[m.sender]++;
+    }
+  });
+  return { total, perSender: senders.map(s=>({ sender:s, count:perSender[s] })) };
+}
+
+function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+
+function computeLoveMetrics(){
+  const senders = allMessages.senders || [];
+  if(senders.length !== 2) return null;
+
+  const real = allMessages.filter(m => !m.system && m.sender && m.timestamp).sort((a,b)=>a.timestamp - b.timestamp);
+  if(real.length < 10) return null;
+
+  const stats = {};
+  senders.forEach(s => stats[s] = {
+    count:0, charTotal:0, questions:0, romanticEmoji:0,
+    replySum:0, replyCount:0, starts:0, doubleTexts:0
+  });
+
+  let lastSender = null, lastTimestamp = null, consecutiveRun = 0;
+  const GAP_MS = 1000*60*60*3; // 3h of silence = a "new" conversation start
+
+  real.forEach((m, i)=>{
+    const s = stats[m.sender];
+    if(!s) return;
+    s.count++;
+    const text = effectiveText(m);
+    if(text) s.charTotal += text.length;
+    if(text && /[؟?]\s*$/.test(text.trim())) s.questions++;
+    if(text){
+      const matches = text.match(ROMANTIC_EMOJI);
+      if(matches) s.romanticEmoji += matches.length;
+    }
+
+    if(lastTimestamp !== null){
+      const gap = m.timestamp - lastTimestamp;
+      if(m.sender === lastSender){
+        consecutiveRun++;
+        if(consecutiveRun === 2) s.doubleTexts++; // count the run once
+      } else {
+        consecutiveRun = 1;
+        if(gap > 0 && gap < 1000*60*60*24*2){
+          s.replySum += gap;
+          s.replyCount++;
+        }
+      }
+      if(gap >= GAP_MS) s.starts++;
+    } else {
+      s.starts++; // very first message of the whole chat
+      consecutiveRun = 1;
+    }
+    lastSender = m.sender;
+    lastTimestamp = m.timestamp;
+  });
+
+  const totalStarts = senders.reduce((a,s)=>a + stats[s].starts, 0) || 1;
+  const maxAvgLen = Math.max(...senders.map(s => stats[s].count ? stats[s].charTotal/stats[s].count : 0), 1);
+
+  const perSender = {};
+  senders.forEach(s=>{
+    const d = stats[s];
+    const avgReplyMs = d.replyCount ? d.replySum/d.replyCount : null;
+    const avgLen = d.count ? d.charTotal/d.count : 0;
+    const questionRatio = d.count ? d.questions/d.count : 0;
+    const emojiRatio = d.count ? d.romanticEmoji/d.count : 0;
+    const initiationShare = d.starts / totalStarts;
+    const doubleTextRatio = d.count ? d.doubleTexts/d.count : 0;
+
+    const replySpeedScore = avgReplyMs === null ? 0.5 : clamp01(1 - (avgReplyMs/60000)/720); // 12h scale
+    const initiationScore = clamp01(initiationShare * senders.length); // ~1 if this sender starts most convos
+    const questionScore = clamp01(questionRatio / 0.25); // 25% question rate ~ full score
+    const emojiScore = clamp01(emojiRatio / 0.15);
+    const lengthScore = clamp01(avgLen / maxAvgLen);
+
+    const score = Math.round(100 * (
+      0.30*replySpeedScore +
+      0.20*initiationScore +
+      0.20*questionScore +
+      0.15*emojiScore +
+      0.15*lengthScore
+    ));
+
+    perSender[s] = {
+      score, avgReplyMs, avgLen, questionRatio, emojiRatio, initiationShare, doubleTextRatio,
+      count: d.count
+    };
+  });
+
+  // Activity trend: compare message volume in the first third of the
+  // timeline vs the last third to see if engagement is rising or fading.
+  const n = real.length;
+  const firstThird = real.slice(0, Math.floor(n/3));
+  const lastThird = real.slice(Math.ceil(n*2/3));
+  const spanDays = (t)=> {
+    if(t.length < 2) return 1;
+    return Math.max(1, (t[t.length-1].timestamp - t[0].timestamp) / (1000*60*60*24));
+  };
+  const firstRate = firstThird.length / spanDays(firstThird);
+  const lastRate = lastThird.length / spanDays(lastThird);
+
+  return { senders, perSender, firstRate, lastRate };
+}
+
+function personalityTags(data, sender){
+  const p = data.perSender[sender];
+  const tags = [];
+
+  if(p.avgReplyMs !== null && p.avgReplyMs/60000 < 15) tags.push('سريع الرد ⚡');
+  else if(p.avgReplyMs !== null && p.avgReplyMs/60000 > 240) tags.push('بياخد وقته في الرد 🕰️');
+
+  if(p.initiationShare > 0.6) tags.push('غالبًا هو اللي بيبدأ الكلام 🚀');
+  else if(p.initiationShare < 0.35) tags.push('بيستنى التاني يبدأ 🙇');
+
+  if(p.questionRatio > 0.18) tags.push('بيسأل كتير وفضولي 🔍');
+  if(p.emojiRatio > 0.12) tags.push('تعبيري وعاطفي في كلامه 💬');
+  if(p.avgLen > 60) tags.push('بيكتب بتفصيل 📝');
+  else if(p.avgLen < 20) tags.push('ردوده مختصرة وقصيرة ✂️');
+  if(p.doubleTextRatio > 0.15) tags.push('بيبعت أكتر من رسالة ورا بعض 📩📩');
+
+  if(tags.length === 0) tags.push('نمط كتابة متوازن ⚖️');
+  return tags;
+}
+
+function renderLoveAnalysis(){
+  const data = computeLoveMetrics();
+  if(!data){
+    loveBody.innerHTML = `
+      <div class="love-disclaimer">تنبيه: التحليل ده تقدير إحصائي مبني على نمط الرسايل بس (سرعة الرد، مين بيبدأ الكلام، الأسئلة، الإيموجي...)، مش تشخيص نفسي ولا حكم قاطع على مشاعر حد.</div>
+      <div class="love-empty">التحليل ده متاح بس للمحادثات بين شخصين، ولازم يكون فيه رسايل كفاية عشان النتيجة تبقى مفيدة.</div>`;
+    return;
+  }
+
+  const { senders, perSender, firstRate, lastRate } = data;
+
+  const scoreBlocks = senders.map(s=>{
+    const p = perSender[s];
+    const tags = personalityTags(data, s);
+    return `
+      <div class="love-score-block">
+        <div class="love-score-name"><span>${escapeHtml(s)}</span><span class="love-score-num">${p.score}٪</span></div>
+        <div class="interest-bar-wrap"><div class="interest-bar-fill" style="width:${p.score}%;"></div></div>
+        <div class="love-metric-row"><span>متوسط وقت الرد</span><span>${p.avgReplyMs==null?'—':formatDuration(p.avgReplyMs)}</span></div>
+        <div class="love-metric-row"><span>نسبة اللي بيبدأ بيها الكلام</span><span>${Math.round(p.initiationShare*100)}٪</span></div>
+        <div class="love-metric-row"><span>نسبة الأسئلة</span><span>${Math.round(p.questionRatio*100)}٪</span></div>
+        <div class="love-metric-row"><span>متوسط طول الرسالة</span><span>${Math.round(p.avgLen)} حرف</span></div>
+        <div class="personality-tags">${tags.map(t=>`<span class="personality-tag">${escapeHtml(t)}</span>`).join('')}</div>
+      </div>`;
+  }).join('');
+
+  const scores = senders.map(s=>perSender[s].score);
+  const diff = Math.abs(scores[0]-scores[1]);
+  let balanceMsg;
+  if(diff < 12) balanceMsg = 'مستوى الاهتمام قريب من بعضه بين الطرفين حسب أنماط الرسايل — مؤشر لتوازن كويس في التفاعل.';
+  else if(diff < 25) balanceMsg = 'فيه فرق ملحوظ في مستوى التفاعل بين الطرفين، بس ده ممكن يرجع لظروف يومية مش بالضرورة قلة اهتمام.';
+  else balanceMsg = 'فيه فرق كبير في مؤشرات التفاعل بين الطرفين — يستاهل تتكلموا عن ده بصراحة بدل ما تفضلوا تخمنوا.';
+
+  let trendMsg;
+  if(lastRate > firstRate * 1.2) trendMsg = 'معدل الرسايل زاد في الفترة الأخيرة مقارنة ببداية المحادثة — التفاعل في تصاعد.';
+  else if(lastRate < firstRate * 0.8) trendMsg = 'معدل الرسايل قل في الفترة الأخيرة مقارنة بالبداية — ممكن يكون فيه فتور في التواصل.';
+  else trendMsg = 'معدل الرسايل شبه ثابت من بداية المحادثة لحد دلوقتي.';
+
+  const real = allMessages.filter(m => !m.system && m.sender && m.timestamp).sort((a,b)=>a.timestamp - b.timestamp);
+
+  // مين بيقفل المحادثة
+  const closers = computeConversationClosers(real, senders);
+  const closersRows = closers.map(c=>`
+    <div class="love-metric-row"><span>${escapeHtml(c.sender)}</span><span>${c.pct}٪ (${c.count} مرة)</span></div>`).join('');
+
+  // نقاط التحول
+  const turningPoints = computeTurningPoints(real);
+  const turningRows = turningPoints.length
+    ? turningPoints.map(p=>{
+        const dateStr = p.date.toLocaleDateString('ar-EG', {day:'numeric', month:'short'});
+        const arrow = p.direction === 'up' ? '📈 زيادة' : '📉 هبوط';
+        return `<div class="turning-point-row">${arrow} حوالي ${dateStr} — من ${p.from} لـ ${p.to} رسالة في الأسبوع (${p.pct}٪)</div>`;
+      }).join('')
+    : `<div class="turning-point-row">مفيش قفزات أو هبوط ملحوظ في معدل الرسايل — النشاط شبه ثابت.</div>`;
+
+  // أيام الأسبوع
+  const weekday = computeWeekdayBreakdown(real);
+  const weekdayRows = weekday.map(w=>`
+    <div class="mini-bar-row">
+      <span class="mini-bar-label">${w.label}</span>
+      <span class="mini-bar-track"><span class="mini-bar-fill" style="width:${w.pct}%;"></span></span>
+      <span class="mini-bar-count">${w.count}</span>
+    </div>`).join('');
+
+  // نغمة الكلام
+  const sentiment = computeSentiment(real, senders);
+  const sentimentRows = sentiment.map(s=>`
+    <div class="love-metric-row"><span>${escapeHtml(s.sender)}</span><span>💞 ${s.posPct}٪ · 😔 ${s.negPct}٪ · 😠 ${s.angerPct}٪</span></div>`).join('');
+
+  // كلمات الخناق والاعتذار
+  const conflict = computeConflictWords(real, senders);
+  const conflictRows = conflict.perSender.map(c=>`
+    <div class="love-metric-row"><span>${escapeHtml(c.sender)}</span><span>${c.count} مرة</span></div>`).join('');
+  const conflictSummary = conflict.total
+    ? `فيه ${conflict.total} رسالة فيها كلمة اعتذار زي "معلش/آسف/خلاص" — مؤشر تقريبي لعدد مرات المصالحة بعد خناقة أو سوء فهم.`
+    : `مفيش كلمات اعتذار واضحة في المحادثة.`;
+
+  // نسبة استخدام الاسم/اللقب
+  const nicknames = computeNicknameUsage(real, senders);
+  const nicknameRows = nicknames.map(n=>`
+    <div class="love-metric-row"><span>${escapeHtml(n.sender)}</span><span>${n.pct}٪ من رسايله</span></div>`).join('');
+
+  // نبرة الصوت (لو اتعمل تحليل صوتي)
+  const voiceTone = computeVoiceToneStats(senders);
+  const untranscribed = getUntranscribedVoiceMessages().length;
+  const anyVoiceData = voiceTone.some(v=>v.has);
+  let voiceToneSection = '';
+  if(anyVoiceData){
+    const voiceRows = voiceTone.map(v=>{
+      if(!v.has) return `<div class="love-metric-row"><span>${escapeHtml(v.sender)}</span><span>مفيش رسايل صوتية متحللة</span></div>`;
+      return `<div class="love-metric-row"><span>${escapeHtml(v.sender)}</span><span>${escapeHtml(v.tone.pitchLabel)} · ${escapeHtml(v.tone.loudLabel)} (${v.count} رسالة)</span></div>`;
+    }).join('');
+    voiceToneSection = `
+    <div class="stat-section-title">🎚️ نبرة الصوت في الرسايل الصوتية (تقديرية)</div>
+    ${voiceRows}
+    <div class="turning-point-row" style="border:none;padding-top:4px;">تقدير تقريبي لتردد وعلو الصوت، مش تحليل مشاعر علمي.${untranscribed ? ' فيه ' + untranscribed + ' رسالة صوتية لسه محتاجة تحليل — دوس "🎙️ حلّل الرسايل الصوتية".' : ''}</div>`;
+  } else if(untranscribed > 0){
+    voiceToneSection = `
+    <div class="stat-section-title">🎚️ نبرة الصوت في الرسايل الصوتية</div>
+    <div class="love-empty">فيه ${untranscribed} رسالة صوتية في المحادثة دي لسه ما اتحللتش. دوس زرار "🎙️ حلّل الرسايل الصوتية" في الأسفل عشان تتحول لنص وتتضاف هنا ولتحليل المشاعر فوق.</div>`;
+  }
+
+  loveBody.innerHTML = `
+    <div class="love-disclaimer">تنبيه: التحليل ده تقدير إحصائي مبني على نمط الرسايل بس (سرعة الرد، مين بيبدأ الكلام، الأسئلة، طول الرسايل، الإيموجي...)، مش تشخيص نفسي ولا حكم قاطع على مشاعر حد. خدوه كمؤشر عام مش كحقيقة نهائية.</div>
+
+    <div class="stat-section-title">مؤشر الاهتمام لكل شخص</div>
+    ${scoreBlocks}
+
+    <div class="stat-section-title">تحليل مستقبل العلاقة</div>
+    <div class="relationship-verdict">
+      ${balanceMsg}<br><br>${trendMsg}
+    </div>
+
+    <div class="stat-section-title">مين بيقفل المحادثة عادة</div>
+    ${closersRows}
+
+    <div class="stat-section-title">نقاط تحول في التواصل</div>
+    ${turningRows}
+
+    <div class="stat-section-title">التفاعل حسب أيام الأسبوع</div>
+    ${weekdayRows}
+
+    <div class="stat-section-title">الحب والاهتمام والغضب 💞😔😠</div>
+    ${sentimentRows}
+    <div class="turning-point-row" style="border:none;padding-top:4px;">مبني على كلمات إيجابية/سلبية/غضب شائعة بالعامية (ونصوص الرسايل الصوتية المفرغة لو اتحللت)، مش تحليل لغوي دقيق.</div>
+
+    <div class="stat-section-title">كلمات الخناق والاعتذار</div>
+    ${conflictRows}
+    <div class="turning-point-row" style="border:none;padding-top:4px;">${conflictSummary}</div>
+
+    <div class="stat-section-title">استخدام ألقاب حنينة/نداء</div>
+    ${nicknameRows}
+    <div class="turning-point-row" style="border:none;padding-top:4px;">نسبة الرسايل اللي فيها نداء زي "يا قمر/يا حبيبي" أو أي "يا ..." تاني.</div>
+    ${voiceToneSection}
+  `;
+}
+
+function showTempNotice(msg){
+  const n = document.createElement('div');
+  n.className = 'empty-starred';
+  n.textContent = msg;
+  messagesEl.innerHTML = '';
+  messagesEl.appendChild(n);
+  setTimeout(()=>renderMessages(), 1600);
+}
+
+// Simple stable hash so each chat file gets its own starred-list in localStorage
+function hashText(str){
+  let h = 0;
+  for(let i=0;i<str.length;i++){
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return 'chat-' + Math.abs(h);
+}
+function loadStarred(){
+  try{
+    const raw = localStorage.getItem(storageKey);
+    starredIds = new Set(raw ? JSON.parse(raw) : []);
+  }catch(e){ starredIds = new Set(); }
+}
+function saveStarred(){
+  try{
+    localStorage.setItem(storageKey, JSON.stringify([...starredIds]));
+  }catch(e){ /* storage unavailable, ignore */ }
+}
+
+// Detects "<attached: filename.jpg>" or "filename.jpg (file attached)" style references
+const attachRegex = /(?:<attached:\s*([^>]+)>)|([\w\-]+\.(?:jpg|jpeg|png|gif|webp|mp4|mov|3gp|opus|ogg|m4a|mp3))\s*\((?:file attached|الملف مرفق)\)/i;
+function extractAttachment(content){
+  const m = content.match(attachRegex);
+  if(!m) return null;
+  return (m[1] || m[2]).trim();
+}
+// Detects messages that are only 1–6 emoji (WhatsApp renders these larger, without a bubble)
+function isEmojiOnlyContent(text){
+  const trimmed = (text || '').trim();
+  if(!trimmed) return false;
+  const stripped = trimmed.replace(/[\u200d\uFE0F]/g, '');
+  if(!/^(?:\p{Extended_Pictographic}|\s)+$/u.test(stripped)) return false;
+  let count;
+  if(typeof Intl !== 'undefined' && Intl.Segmenter){
+    count = [...new Intl.Segmenter(undefined, {granularity:'grapheme'}).segment(trimmed)].length;
+  } else {
+    count = [...trimmed].length;
+  }
+  return count >= 1 && count <= 6;
+}
+
+function isImageFile(name){ return /\.(jpe?g|png|gif|webp)$/i.test(name); }
+function isVideoFile(name){ return /\.(mp4|mov|3gp)$/i.test(name); }
+function isAudioFile(name){ return /\.(opus|ogg|m4a|mp3)$/i.test(name); }
+
+// Returns the text a message should contribute to word/sentiment analysis:
+// the message's own text if it's a normal text message, or its transcript
+// (once voice analysis has run) if it's a voice note — otherwise empty.
+function effectiveText(m){
+  const attach = extractAttachment(m.content);
+  if(attach) return m.transcript || '';
+  return m.content || '';
+}
+function mimeFor(name){
+  const ext = name.split('.').pop().toLowerCase();
+  const map = {
+    jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp',
+    mp4:'video/mp4', mov:'video/quicktime', '3gp':'video/3gpp',
+    opus:'audio/ogg', ogg:'audio/ogg', m4a:'audio/mp4', mp3:'audio/mpeg'
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+// =========================================================================
+// Voice message analysis: transcription (Whisper, on-device via a Worker)
+// + a lightweight approximate tone/pitch read. Everything runs locally in
+// the browser — audio never leaves the device. Ported and adapted from the
+// standalone "محول الرسايل الصوتية لنص" tool.
+// =========================================================================
+const VOICE_CHUNK_SEC = 25;
+const VOICE_OVERLAP_SEC = 2;
+const VOICE_MIN_SPLIT_SEC = 35;
+const VOICE_MODEL = 'tiny'; // fastest model — good default for bulk chat analysis
+const VOICE_MODEL_LOAD_TIMEOUT_MS = 600000;
+
+let voicePool = [];
+let voicePoolReady = false;
+let voiceAnalysisRunning = false;
+
+const VOICE_WORKER_SRC = `
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
+env.allowLocalModels = false;
+env.backends.onnx.wasm.proxy = false;
+env.backends.onnx.wasm.numThreads = 1;
+
+let transcriber = null;
+
+self.onmessage = async (e) => {
+  const data = e.data;
+  if(data.cmd === 'load'){
+    try{
+      const opts = { progress_callback: (p) => {
+        if(p.status === 'progress'){
+          self.postMessage({ type:'progress', progress: p.progress || 0 });
+        }
+      }};
+      if(data.device) opts.device = data.device;
+      try{
+        transcriber = await pipeline('automatic-speech-recognition', data.model, opts);
+      }catch(errDevice){
+        delete opts.device;
+        transcriber = await pipeline('automatic-speech-recognition', data.model, opts);
+      }
+      self.postMessage({ type:'ready' });
+    }catch(err){
+      self.postMessage({ type:'load-error', error: String(err && err.message || err) });
+    }
+    return;
+  }
+  if(data.cmd === 'transcribe'){
+    try{
+      const arr = new Float32Array(data.pcm);
+      const result = await transcriber(arr, { language:'arabic', task:'transcribe', chunk_length_s:30, stride_length_s:5 });
+      self.postMessage({ type:'result', taskId:data.taskId, text:(result.text||'').trim() });
+    }catch(err){
+      self.postMessage({ type:'error', taskId:data.taskId, error:String(err && err.message || err) });
+    }
+  }
+};
+`;
+
+function createVoiceWorker(){
+  const blob = new Blob([VOICE_WORKER_SRC], { type:'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  return new Worker(url, { type:'module' });
+}
+
+function loadVoiceWorker(modelId, device, onProgress, timeoutMs){
+  return new Promise((resolve, reject)=>{
+    const w = createVoiceWorker();
+    let settled = false;
+    const timer = setTimeout(()=>{
+      if(settled) return;
+      settled = true;
+      w.terminate();
+      reject(Object.assign(new Error('timeout'), { isTimeout:true }));
+    }, timeoutMs);
+    w.onerror = (e)=>{
+      if(settled) return;
+      settled = true;
+      clearTimeout(timer);
+      w.terminate();
+      reject(new Error('فشل تحميل سكريبت التفريغ الصوتي (على الأغلب الاستيراد اتمنع لأن الملف مفتوح محليًا مش من سيرفر): ' + (e.message || 'unknown error')));
+    };
+    w.onmessage = (e)=>{
+      const d = e.data;
+      if(d.type === 'progress'){
+        onProgress(d.progress || 0);
+      } else if(d.type === 'ready'){
+        if(settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(w);
+      } else if(d.type === 'load-error'){
+        if(settled) return;
+        settled = true;
+        clearTimeout(timer);
+        w.terminate();
+        reject(new Error(d.error));
+      }
+    };
+    w.postMessage({ cmd:'load', model: modelId, device });
+  });
+}
+
+async function ensureVoicePool(){
+  if(voicePoolReady && voicePool.length) return;
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const hasWebGPU = !!navigator.gpu;
+  const device = hasWebGPU ? 'webgpu' : 'wasm';
+  const modelId = 'Xenova/whisper-' + VOICE_MODEL;
+  voiceProgressText.textContent = `بيحمّل موديل التفريغ الصوتي (أول مرة بس، هيتخزن بعد كده)...`;
+  const onProgress = (p)=>{ voiceProgressFill.style.width = Math.min(100,p).toFixed(0) + '%'; };
+  try{
+    const w = await loadVoiceWorker(modelId, device, onProgress, VOICE_MODEL_LOAD_TIMEOUT_MS);
+    voicePool = [w];
+  }catch(err){
+    if(device === 'webgpu'){
+      voiceProgressText.textContent = 'الرسم المتسارع اتعلّق، بيرجع يحمّل عادي على المعالج...';
+      const w = await loadVoiceWorker(modelId, 'wasm', onProgress, VOICE_MODEL_LOAD_TIMEOUT_MS * 2);
+      voicePool = [w];
+    } else {
+      throw err;
+    }
+  }
+  voicePoolReady = true;
+}
+
+async function decodeAudioToPCM16k(blob){
+  const arrayBuffer = await blob.arrayBuffer();
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const tmpCtx = new AC();
+  let audioBuffer;
+  try{
+    audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer.slice(0));
+  } finally {
+    tmpCtx.close();
+  }
+  const targetRate = 16000;
+  const length = Math.max(1, Math.ceil(audioBuffer.duration * targetRate));
+  const offlineCtx = new OfflineAudioContext(1, length, targetRate);
+  const source = offlineCtx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(offlineCtx.destination);
+  source.start(0);
+  const rendered = await offlineCtx.startRendering();
+  return rendered.getChannelData(0);
+}
+
+function splitVoiceSegments(pcm){
+  const sr = 16000;
+  const duration = pcm.length / sr;
+  if(duration <= VOICE_MIN_SPLIT_SEC) return [Float32Array.from(pcm)];
+  const chunkSamples = VOICE_CHUNK_SEC * sr;
+  const overlapSamples = VOICE_OVERLAP_SEC * sr;
+  const segs = [];
+  let start = 0;
+  while(start < pcm.length){
+    const end = Math.min(pcm.length, start + chunkSamples);
+    segs.push(Float32Array.from(pcm.subarray(start, end)));
+    if(end >= pcm.length) break;
+    start = end - overlapSamples;
+  }
+  return segs;
+}
+
+function joinVoiceDedup(a, b){
+  const aWords = a.trim().split(/\s+/).filter(Boolean);
+  const bWords = b.trim().split(/\s+/).filter(Boolean);
+  if(aWords.length === 0) return b.trim();
+  if(bWords.length === 0) return a.trim();
+  const maxOverlap = Math.min(8, aWords.length, bWords.length);
+  let overlap = 0;
+  for(let n = maxOverlap; n > 0; n--){
+    if(aWords.slice(-n).join(' ') === bWords.slice(0, n).join(' ')){ overlap = n; break; }
+  }
+  return (a.trim() + ' ' + bWords.slice(overlap).join(' ')).trim();
+}
+function mergeVoiceSegmentTexts(texts){
+  return texts.reduce((acc, t) => acc === '' ? t.trim() : joinVoiceDedup(acc, t), '').trim();
+}
+
+async function transcribeOnWorker(worker, pcmSegments){
+  const texts = [];
+  for(const seg of pcmSegments){
+    const buf = seg.buffer;
+    const text = await new Promise((resolve)=>{
+      const handler = (e)=>{
+        const d = e.data;
+        if(d.type === 'result'){ worker.removeEventListener('message', handler); resolve(d.text); }
+        else if(d.type === 'error'){ worker.removeEventListener('message', handler); resolve(''); }
+      };
+      worker.addEventListener('message', handler);
+      worker.postMessage({ cmd:'transcribe', taskId:'m', pcm:buf, language:'arabic' }, [buf]);
+    });
+    texts.push(text);
+  }
+  return mergeVoiceSegmentTexts(texts);
+}
+
+// --- Approximate voice-tone analysis (pitch + loudness via autocorrelation) ---
+// This is a rough acoustic estimate, not a scientific emotion-detection tool.
+function analyzeVoiceTone(pcm, sr){
+  const frameSize = Math.round(0.032 * sr) || 512;
+  if(pcm.length <= frameSize) return { voiced:false, avgRms:0 };
+  const maxFrames = 220;
+  const totalPossible = Math.floor((pcm.length - frameSize) / frameSize) + 1;
+  const step = Math.max(frameSize, Math.floor(pcm.length / Math.min(maxFrames, Math.max(1, totalPossible))));
+  const minLag = Math.max(2, Math.floor(sr / 400));
+  const maxLag = Math.floor(sr / 70);
+
+  const pitches = [];
+  let rmsSum = 0, rmsCount = 0;
+
+  for(let start = 0; start + frameSize <= pcm.length; start += step){
+    let sumSq = 0;
+    for(let i = 0; i < frameSize; i++){ const v = pcm[start + i]; sumSq += v * v; }
+    const rms = Math.sqrt(sumSq / frameSize);
+    rmsSum += rms; rmsCount++;
+    if(rms < 0.01) continue;
+
+    let bestLag = -1, bestVal = 0;
+    for(let lag = minLag; lag <= maxLag && start + lag + frameSize <= pcm.length; lag++){
+      let sum = 0, normA = 0, normB = 0;
+      for(let i = 0; i < frameSize; i++){
+        const a = pcm[start + i], b = pcm[start + i + lag];
+        sum += a * b; normA += a * a; normB += b * b;
+      }
+      const denom = Math.sqrt(normA * normB) || 1e-9;
+      const corr = sum / denom;
+      if(corr > bestVal){ bestVal = corr; bestLag = lag; }
+    }
+    if(bestLag > 0 && bestVal > 0.35) pitches.push(sr / bestLag);
+  }
+
+  const avgRms = rmsCount ? rmsSum / rmsCount : 0;
+  if(pitches.length < 3) return { voiced:false, avgRms };
+
+  const avgPitch = pitches.reduce((a,b)=>a+b,0) / pitches.length;
+  const variance = pitches.reduce((a,b)=>a+(b-avgPitch)*(b-avgPitch),0) / pitches.length;
+  return { voiced:true, avgPitch, stdDev:Math.sqrt(variance), avgRms };
+}
+
+function describeVoiceLoudness(rms){
+  if(!rms) return '';
+  const db = 20 * Math.log10(rms || 1e-9);
+  if(db > -15) return 'صوت عالي نسبيًا';
+  if(db > -28) return 'صوت متوسط العلو';
+  return 'صوت هادئ/منخفض';
+}
+
+function describeVoiceTone(stats){
+  const loudLabel = describeVoiceLoudness(stats && stats.avgRms);
+  if(!stats || !stats.voiced) return { pitchLabel:'مفيش صوت واضح كفاية للتحليل', varLabel:'', loudLabel };
+  let pitchLabel;
+  if(stats.avgPitch < 150) pitchLabel = 'نبرة منخفضة (هادي/عميق)';
+  else if(stats.avgPitch < 220) pitchLabel = 'نبرة متوسطة';
+  else pitchLabel = 'نبرة عالية/حادة';
+
+  const relVar = stats.avgPitch ? stats.stdDev / stats.avgPitch : 0;
+  let varLabel;
+  if(relVar > 0.28) varLabel = 'متغيرة بشكل واضح — ممكن تدل على انفعال';
+  else if(relVar > 0.15) varLabel = 'متغيرة بشكل معتدل';
+  else varLabel = 'شبه ثابتة وهادئة';
+
+  return { pitchLabel, varLabel, loudLabel, avgPitch: stats.avgPitch };
+}
+
+// Collects every message that has a playable audio attachment and doesn't
+// have a transcript yet.
+function getUntranscribedVoiceMessages(){
+  return allMessages.filter(m=>{
+    if(m.transcript !== undefined) return false;
+    const attach = extractAttachment(m.content);
+    if(!attach) return false;
+    const key = attach.toLowerCase();
+    return isAudioFile(key) && mediaBlobs[key];
+  });
+}
+
+async function analyzeVoiceMessages(){
+  if(voiceAnalysisRunning) return;
+  const targets = getUntranscribedVoiceMessages();
+  if(targets.length === 0){
+    showTempNotice('كل الرسايل الصوتية اتحللت خلاص، أو مفيش رسايل صوتية في المحادثة.');
+    return;
+  }
+  voiceAnalysisRunning = true;
+  voiceAnalyzeBtn.disabled = true;
+  const originalLabel = voiceAnalyzeBtn.textContent;
+  voiceAnalyzeBtn.textContent = '⏳ بيحلل...';
+  voiceProgressBanner.style.display = 'block';
+  voiceProgressFill.style.width = '0%';
+  voiceProgressText.textContent = `بيحمّل موديل التفريغ الصوتي...`;
+
+  try{
+    await ensureVoicePool();
+    const worker = voicePool[0];
+
+    let done = 0;
+    for(const m of targets){
+      const attach = extractAttachment(m.content);
+      const key = attach.toLowerCase();
+      voiceProgressText.textContent = `بيحلل رسالة صوتية (${done+1}/${targets.length})...`;
+      voiceProgressFill.style.width = Math.round((done/targets.length)*100) + '%';
+      try{
+        const blob = mediaBlobs[key];
+        const pcm = await decodeAudioToPCM16k(blob);
+        m.audioStats = analyzeVoiceTone(pcm, 16000);
+        const segs = splitVoiceSegments(pcm);
+        m.transcript = await transcribeOnWorker(worker, segs);
+      }catch(err){
+        console.error('voice analysis failed for', key, err);
+        m.transcript = '';
+        m.audioStats = null;
+      }
+      done++;
+      voiceProgressFill.style.width = Math.round((done/targets.length)*100) + '%';
+    }
+    voiceProgressText.textContent = `خلص! اتحلل ${done} رسالة صوتية.`;
+    renderMessages();
+    showTempNotice(`✅ اتحلل ${done} رسالة صوتية — النصوص وتحليل النبرة اتضافوا للمحادثة وتحليل المشاعر.`);
+  }catch(err){
+    console.error(err);
+    voiceProgressText.textContent = 'تعذر تحميل موديل التفريغ الصوتي: ' + (err.message || err);
+    showTempNotice('حصل خطأ في تحليل الرسايل الصوتية. جرب تاني أو تأكد من النت في أول مرة (بيحمّل الموديل).');
+  }finally{
+    voiceAnalysisRunning = false;
+    voiceAnalyzeBtn.disabled = false;
+    voiceAnalyzeBtn.textContent = originalLabel;
+    setTimeout(()=>{ if(!voiceAnalysisRunning) voiceProgressBanner.style.display = 'none'; }, 4000);
+  }
+}
+
+function computeVoiceToneStats(senders){
+  const perSender = {};
+  senders.forEach(s => perSender[s] = []);
+  allMessages.forEach(m=>{
+    if(m.audioStats && m.audioStats.voiced && perSender[m.sender]) perSender[m.sender].push(m.audioStats);
+  });
+  return senders.map(s=>{
+    const arr = perSender[s];
+    if(!arr.length) return { sender:s, has:false };
+    const avgPitch = arr.reduce((a,x)=>a+x.avgPitch,0) / arr.length;
+    const avgStd = arr.reduce((a,x)=>a+x.stdDev,0) / arr.length;
+    const avgRms = arr.reduce((a,x)=>a+x.avgRms,0) / arr.length;
+    const tone = describeVoiceTone({ voiced:true, avgPitch, stdDev:avgStd, avgRms });
+    return { sender:s, has:true, count:arr.length, avgPitch, tone };
+  });
+}
+
+['dragover','dragenter'].forEach(ev=>{
+  dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+});
+['dragleave','drop'].forEach(ev=>{
+  dropZone.addEventListener(ev, e=>{ e.preventDefault(); dropZone.classList.remove('drag'); });
+});
+dropZone.addEventListener('drop', e=>{
+  const f = e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+fileInput.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(f) handleFile(f);
+});
+resetBtn.addEventListener('click', ()=>{
+  chatScreen.style.display = 'none';
+  uploadScreen.style.display = 'flex';
+  dropZone.style.display = '';
+  loadingState.style.display = 'none';
+  errorBox.innerHTML = '';
+  messagesEl.innerHTML = '';
+  fileInput.value = '';
+  revokeMediaUrls();
+});
+
+function showError(msg){
+  errorBox.innerHTML = `<div class="error-box">${msg}</div>`;
+}
+
+async function handleFile(file){
+  errorBox.innerHTML = '';
+  revokeMediaUrls();
+  const sizeMB = file.size / (1024 * 1024);
+  dropZone.style.display = 'none';
+  loadingState.style.display = 'flex';
+  loadingLabel.textContent = '⏳ بيتم تجهيز الملف...';
+  loadingSub.textContent = sizeMB > 100
+    ? `الملف حجمه ${Math.round(sizeMB)} م.ب — ده كبير، ممكن ياخد كذا دقيقة وممكن الموبايل يبطّئ. متقفلش الصفحة.`
+    : 'من فضلك متقفلش الصفحة';
+  await new Promise(r => setTimeout(r, 30)); // let the spinner paint before the heavy work starts
+  try{
+    let text;
+    if(file.name.toLowerCase().endsWith('.zip')){
+      loadingLabel.textContent = '⏳ بيتم فك ضغط الملف...';
+      const zip = await JSZip.loadAsync(file);
+      let txtFile = null;
+      const mediaEntries = [];
+      zip.forEach((path, entry)=>{
+        if(entry.dir) return;
+        if(path.toLowerCase().endsWith('.txt') && !txtFile){
+          txtFile = entry;
+        } else if(/\.(jpe?g|png|gif|webp|mp4|mov|3gp|opus|ogg|m4a|mp3)$/i.test(path)){
+          mediaEntries.push(entry);
+        }
+      });
+      if(!txtFile){
+        showError('مفيش ملف .txt جوه الـ zip ده. تأكد إنك بعتّ ملف التصدير الصح من واتساب.');
+        dropZone.style.display = '';
+        loadingState.style.display = 'none';
+        return;
+      }
+      text = await txtFile.async('string');
+      let tooBig = false;
+      for(let i = 0; i < mediaEntries.length; i++){
+        const entry = mediaEntries[i];
+        if(i % 15 === 0){
+          loadingLabel.textContent = `⏳ بيتم تحميل الميديا... (${i}/${mediaEntries.length})`;
+          await new Promise(r => setTimeout(r, 0)); // yield to the UI thread so it doesn't look frozen
+        }
+        const blob = await entry.async('blob');
+        const name = entry.name.split('/').pop().toLowerCase();
+        const typedBlob = blob.type ? blob : new Blob([blob], {type: mimeFor(name)});
+        mediaBlobs[name] = typedBlob;
+        mediaMap[name] = URL.createObjectURL(typedBlob);
+        if(typedBlob.size > 8 * 1024 * 1024) tooBig = true;
+      }
+      if(mediaEntries.length > 400 || tooBig){
+        showTempFileNotice('الملف فيه ميديا كتير/كبيرة — العرض هيشتغل عادي بس "نسخة متكاملة" ممكن تاخد وقت أطول في التصدير.');
+      }
+    } else if(file.name.toLowerCase().endsWith('.txt')){
+      text = await file.text();
+    } else {
+      showError('الملف المطلوب لازم يكون .txt أو .zip بس.');
+      dropZone.style.display = '';
+      loadingState.style.display = 'none';
+      return;
+    }
+    checkEncodingIssues(text);
+    renderChat(text);
+  } catch(err){
+    console.error(err);
+    showError('حصل خطأ وإحنا بنحاول نفتح الملف. لو الملف كبير جداً ممكن الموبايل ميقدرش يعالجه — جرب على كمبيوتر أو صدّر شات أقصر.');
+    dropZone.style.display = '';
+    loadingState.style.display = 'none';
+  } finally {
+    fileInput.value = '';
+  }
+}
+
+// Parses WhatsApp export lines like:
+// 12/07/2026, 4:31 pm - Ahmed: hello there
+// or [12/07/2026, 4:31:09 PM] Ahmed: hello there
+// Converts Arabic-Indic (٠-٩) and Extended Arabic-Indic (۰-۹, Persian/Urdu)
+// digits to plain ASCII digits, since some phones export WhatsApp chats with
+// localized digits in the date/time stamps.
+function toAsciiDigits(str){
+  return str.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, ch=>{
+    const code = ch.charCodeAt(0);
+    if(code >= 0x0660 && code <= 0x0669) return String(code - 0x0660);
+    return String(code - 0x06F0);
+  });
+}
+
+// Strips invisible bidi/formatting marks (LRM, RLM, embedding/isolate
+// controls, BOM, zero-width space) that WhatsApp sometimes inserts at the
+// start of each line on RTL-locale phones — these break regexes anchored
+// with ^ if left in place.
+function stripInvisible(str){
+  return str.replace(/[\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '');
+}
+
+function parseWaDate(str){
+  if(!str) return null;
+  const parts = str.split('/');
+  if(parts.length !== 3) return null;
+  let a = parseInt(parts[0], 10);
+  let b = parseInt(parts[1], 10);
+  let c = parseInt(parts[2], 10);
+  if(isNaN(a) || isNaN(b) || isNaN(c)) return null;
+  let day, month, year;
+  if(parts[0].length === 4 || a > 31){
+    // Year-first export format: YYYY/MM/DD
+    year = a; month = b; day = c;
+  } else {
+    year = c;
+    if(year < 100) year += 2000;
+    if(dateFormatMode === 'MDY'){ month = a; day = b; } else { day = a; month = b; }
+  }
+  const d = new Date(year, month - 1, day);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Looks at every date string in the file: if any first component is >12 the
+// order must be day-first (DMY); if any second component is >12 it must be
+// month-first (MDY). Falls back to the current default when ambiguous.
+// Year-first (YYYY/MM/DD) dates are skipped since those are handled directly
+// by parseWaDate and don't need this day/month disambiguation.
+function detectDateFormat(messages){
+  let sawFirstOver12 = false, sawSecondOver12 = false;
+  for(const m of messages){
+    const parts = (m.date || '').split('/');
+    if(parts.length !== 3) continue;
+    if(parts[0].length === 4) continue; // year-first date, not ambiguous
+    const a = parseInt(parts[0], 10), b = parseInt(parts[1], 10);
+    if(a > 31) continue; // also looks year-first, skip
+    if(a > 12) sawFirstOver12 = true;
+    if(b > 12) sawSecondOver12 = true;
+    if(sawFirstOver12 && sawSecondOver12) break;
+  }
+  if(sawFirstOver12 && !sawSecondOver12) return 'DMY';
+  if(sawSecondOver12 && !sawFirstOver12) return 'MDY';
+  return 'DMY'; // ambiguous — default to day-first (common outside the US)
+}
+
+function parseWaTime(str){
+  if(!str) return null;
+  const m = str.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([APap]\.?[Mm]\.?|ص|م)?$/);
+  if(!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const sec = m[3] ? parseInt(m[3], 10) : 0;
+  const rawAmpm = (m[4] || '').replace(/\./g, '').toLowerCase();
+  const isPm = rawAmpm === 'pm' || rawAmpm === 'م';
+  const isAm = rawAmpm === 'am' || rawAmpm === 'ص';
+  if(isPm && h < 12) h += 12;
+  if(isAm && h === 12) h = 0;
+  return {h, min, sec};
+}
+
+function combineDateTime(dateObj, time){
+  if(!dateObj || !time) return null;
+  const d = new Date(dateObj);
+  d.setHours(time.h, time.min, time.sec, 0);
+  return d;
+}
+
+function parseWhatsApp(rawText){
+  const text = stripInvisible(toAsciiDigits(rawText));
+  const lines = text.split(/\r?\n/);
+  const ampmPart = '(?:\\s?[APap]\\.?[Mm]\\.?|\\s?ص|\\s?م)?';
+  const lineRegex1 = new RegExp('^(\\d{1,4}/\\d{1,2}/\\d{1,4}),?،?\\s+(\\d{1,2}:\\d{2}(?::\\d{2})?' + ampmPart + ')\\s*[-–—]\\s*(.*)$');
+  const lineRegex2 = new RegExp('^\\[(\\d{1,4}/\\d{1,2}/\\d{1,4}),?،?\\s+(\\d{1,2}:\\d{2}(?::\\d{2})?' + ampmPart + ')\\]\\s*(.*)$');
+
+  const messages = [];
+  let current = null;
+
+  for(const rawLine of lines){
+    if(!rawLine.trim() && !current) continue;
+    let m = rawLine.match(lineRegex1) || rawLine.match(lineRegex2);
+    if(m){
+      const [, date, time, rest] = m;
+      const sepIdx = rest.indexOf(':');
+      let sender = null, content = rest;
+      // find "Name: message" pattern (avoid matching URLs with colons badly by requiring name before first colon w/o newline)
+      const nameMatch = rest.match(/^([^:]{1,40}?):\s(.*)$/s);
+      if(nameMatch){
+        sender = nameMatch[1].trim();
+        content = nameMatch[2];
+      } else {
+        sender = null;
+        content = rest;
+      }
+      current = { date, time, sender, content, system: !sender };
+      messages.push(current);
+    } else if(current){
+      current.content += '\n' + rawLine;
+    }
+  }
+  return messages;
+}
+
+function renderChat(text){
+  const messages = parseWhatsApp(text);
+  if(messages.length === 0){
+    const sampleLine = text.split(/\r?\n/).find(l => l.trim()) || '';
+    const sample = sampleLine.length > 80 ? sampleLine.slice(0, 80) + '…' : sampleLine;
+    showError(
+      'مقدرتش أفهم شكل الملف ده. تأكد إنه ملف نصي مصدّر من واتساب.' +
+      (sample ? `<br><span style="font-size:11px; opacity:0.8; direction:ltr; unicode-bidi:plaintext; display:block; margin-top:6px;">أول سطر لقيته: ${escapeHtml(sample)}</span>` : '')
+    );
+    dropZone.style.display = '';
+    loadingState.style.display = 'none';
+    return;
+  }
+
+  dateFormatMode = detectDateFormat(messages);
+  updateDateFormatUI();
+
+  messages.forEach((m,i)=>{
+    m.id = i;
+    m.dateObj = parseWaDate(m.date);
+    m.timestamp = combineDateTime(m.dateObj, parseWaTime(m.time));
+  });
+  allMessages = messages;
+
+  const senders = [...new Set(messages.filter(m=>m.sender).map(m=>m.sender))];
+  const primarySender = senders[0] || 'أنا';
+  allMessages.primarySender = primarySender;
+  allMessages.senders = senders;
+
+  chatTitle.textContent = senders.length > 1 ? senders.filter(s=>s!==primarySender).join('، ') || 'محادثة' : 'محادثة';
+  chatSub.textContent = senders.length + ' مشارك' + (senders.length>1?'ين':'');
+  msgCount.textContent = messages.length + ' رسالة';
+
+  storageKey = 'wa-viewer-starred-' + hashText(text.slice(0, 2000) + '-' + messages.length);
+  loadStarred();
+
+  showStarredOnly = false;
+  starredBtn.classList.remove('active');
+  starredBtn.textContent = '⭐ الرسايل المميزة';
+  searchQuery = '';
+  searchInput.value = '';
+  senderFilterValue = '';
+  customDateFrom = '';
+  customDateTo = '';
+  typeFilterValue = '';
+  dateFromInput.value = '';
+  dateToInput.value = '';
+  typeFilter.value = '';
+  advFilters.classList.remove('show');
+  advToggleBtn.classList.remove('active');
+  searchMatchIds = [];
+  searchMatchIndex = 0;
+  currentPage = 1;
+  viewFromStart = false;
+  senderFilter.innerHTML = '<option value="">كل الأشخاص</option>' +
+    senders.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+
+  const uniqueDates = [...new Set(messages.map(m=>m.date))];
+  dateJump.innerHTML = '<option value="">📅 التاريخ</option>' +
+    uniqueDates.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+
+  uploadScreen.style.display = 'none';
+  chatScreen.style.display = 'flex';
+  renderMessages();
+}
+
+function jumpSearchMatch(direction){
+  if(!searchMatchIds.length) return;
+  searchMatchIndex = (searchMatchIndex + direction + searchMatchIds.length) % searchMatchIds.length;
+  const targetId = searchMatchIds[searchMatchIndex];
+  currentPage = Math.max(currentPage, Math.ceil((searchMatchIndex + 1) / PAGE_SIZE));
+  renderMessages();
+  requestAnimationFrame(()=>{
+    const row = messagesEl.querySelector(`[data-msg-id="${targetId}"]`);
+    if(row){
+      row.scrollIntoView({behavior:'smooth', block:'center'});
+      const bubble = row.querySelector('.bubble');
+      if(bubble){
+        bubble.classList.add('search-focus');
+        setTimeout(()=> bubble.classList.remove('search-focus'), 1200);
+      }
+    }
+  });
+}
+
+function toggleStar(id){
+  if(starredIds.has(id)) starredIds.delete(id);
+  else starredIds.add(id);
+  saveStarred();
+  renderMessages();
+}
+
+function renderMessages(){
+  const senders = allMessages.senders || [];
+  const primarySender = allMessages.primarySender;
+
+  let list = showStarredOnly
+    ? allMessages.filter(m => !m.system && starredIds.has(m.id))
+    : allMessages;
+
+  if(senderFilterValue){
+    list = list.filter(m => m.sender === senderFilterValue);
+  }
+  const rawQ = searchQuery.trim();
+  const q = rawQ.toLowerCase();
+  const dateRange = resolveDateQuery(rawQ);
+  let textQ = q; // used for highlighting matched text; cleared when this is a date query
+  if(dateRange){
+    list = list.filter(m => !m.system && m.dateObj && m.dateObj >= dateRange.from && m.dateObj <= dateRange.to);
+    textQ = '';
+  } else if(q){
+    list = list.filter(m => !m.system && m.content.toLowerCase().includes(q));
+  }
+
+  const hasCustomRange = !!(customDateFrom || customDateTo);
+  if(hasCustomRange){
+    const from = customDateFrom ? startOfDay(new Date(customDateFrom)) : null;
+    const to = customDateTo ? endOfDay(new Date(customDateTo)) : null;
+    list = list.filter(m => {
+      if(m.system || !m.dateObj) return false;
+      if(from && m.dateObj < from) return false;
+      if(to && m.dateObj > to) return false;
+      return true;
+    });
+  }
+
+  if(typeFilterValue){
+    list = list.filter(m => {
+      if(m.system) return false;
+      const attach = extractAttachment(m.content);
+      if(typeFilterValue === 'image') return attach && isImageFile(attach);
+      if(typeFilterValue === 'video') return attach && isVideoFile(attach);
+      if(typeFilterValue === 'audio') return attach && isAudioFile(attach);
+      if(typeFilterValue === 'link') return !attach && /((?:https?:\/\/|www\.)[^\s]+)/i.test(m.content);
+      return true;
+    });
+  }
+
+  const advActive = hasCustomRange || !!typeFilterValue;
+
+  if(dateRange){
+    searchCount.innerHTML = `<span>${list.length} رسالة في الفترة دي</span>`;
+  } else if(q){
+    searchMatchIds = list.map(m=>m.id);
+    if(searchMatchIndex >= searchMatchIds.length) searchMatchIndex = 0;
+    const posLabel = searchMatchIds.length ? `${searchMatchIndex+1}/${searchMatchIds.length}` : '0/0';
+    searchCount.innerHTML = `<span>${list.length} نتيجة</span>` +
+      (searchMatchIds.length > 1 ? `<span class="search-nav show"><button type="button" id="searchPrevBtn" title="السابق">▲</button><span>${posLabel}</span><button type="button" id="searchNextBtn" title="التالي">▼</button></span>` : '');
+    const prevBtn = document.getElementById('searchPrevBtn');
+    const nextBtn = document.getElementById('searchNextBtn');
+    if(prevBtn) prevBtn.addEventListener('click', ()=> jumpSearchMatch(-1));
+    if(nextBtn) nextBtn.addEventListener('click', ()=> jumpSearchMatch(1));
+  } else if(advActive){
+    searchCount.innerHTML = `<span>${list.length} رسالة مطابقة للفلتر</span>`;
+  } else {
+    searchCount.innerHTML = '';
+    searchMatchIds = [];
+  }
+
+  messagesEl.innerHTML = '';
+
+  if(showStarredOnly && list.length === 0 && !q && !dateRange && !senderFilterValue && !advActive){
+    const empty = document.createElement('div');
+    empty.className = 'empty-starred';
+    empty.textContent = '⭐ لسه مفيش رسايل متحفظة كمميزة. دوس على النجمة اللي فوق أي رسالة عشان تحفظها هنا.';
+    messagesEl.appendChild(empty);
+    return;
+  }
+  if(list.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'no-results';
+    empty.textContent = '🔍 مفيش رسايل مطابقة للبحث/الفلتر ده.';
+    messagesEl.appendChild(empty);
+    return;
+  }
+
+  const flatView = showStarredOnly || !!q || !!dateRange || !!senderFilterValue || advActive;
+  const headAnchored = flatView || viewFromStart;
+  lastListLength = list.length;
+  let lastDate = null;
+
+  let displayList = list;
+  let remaining = 0;
+  let olderRemaining = 0;
+  if(headAnchored){
+    const limit = currentPage * PAGE_SIZE;
+    remaining = Math.max(0, list.length - limit);
+    displayList = list.slice(0, limit);
+  } else {
+    const limit = currentPage * PAGE_SIZE * 2;
+    if(list.length > limit){
+      olderRemaining = list.length - limit;
+      displayList = list.slice(-limit);
+    }
+  }
+
+  if(olderRemaining > 0){
+    const loadOlder = document.createElement('button');
+    loadOlder.className = 'load-more';
+    loadOlder.type = 'button';
+    loadOlder.textContent = `تحميل رسايل أقدم (${olderRemaining} متبقية)`;
+    loadOlder.addEventListener('click', ()=>{
+      const prevHeight = messagesEl.scrollHeight;
+      const prevScroll = messagesEl.scrollTop;
+      currentPage++;
+      renderMessages();
+      requestAnimationFrame(()=>{
+        messagesEl.scrollTop = messagesEl.scrollHeight - prevHeight + prevScroll;
+      });
+    });
+    messagesEl.appendChild(loadOlder);
+  }
+
+  displayList.forEach(m=>{
+    if(!flatView && m.date !== lastDate){
+      const sep = document.createElement('div');
+      sep.className = 'day-sep';
+      sep.textContent = m.date;
+      messagesEl.appendChild(sep);
+      lastDate = m.date;
+    }
+
+    if(m.system){
+      const sysEl = document.createElement('div');
+      sysEl.className = 'system-msg';
+      sysEl.textContent = m.content;
+      messagesEl.appendChild(sysEl);
+      return;
+    }
+
+    const isOut = m.sender === primarySender;
+    const row = document.createElement('div');
+    row.className = 'bubble-row ' + (isOut ? 'out' : 'in');
+    row.setAttribute('data-msg-id', m.id);
+
+    const bubble = document.createElement('div');
+    const isStarred = starredIds.has(m.id);
+    bubble.className = 'bubble ' + (isOut ? 'out' : 'in') + (isStarred ? ' starred' : '');
+
+    let inner = '';
+    if(senders.length > 2){
+      inner += `<span class="sender">${escapeHtml(m.sender)}</span>`;
+    }
+
+    const attachName = extractAttachment(m.content);
+    if(attachName){
+      const key = attachName.toLowerCase();
+      if(mediaMap[key]){
+        if(isImageFile(key)){
+          inner += `<img class="media-img" src="${mediaMap[key]}" alt="صورة مرفقة" data-lightbox-src="${mediaMap[key]}" loading="lazy" decoding="async"/>`;
+        } else if(isVideoFile(key)){
+          inner += `<video class="media-video" src="${mediaMap[key]}" controls preload="metadata"></video>`;
+        } else if(isAudioFile(key)){
+          inner += `<div class="audio-wrap"><audio class="media-audio" src="${mediaMap[key]}" controls preload="metadata"></audio><span class="audio-duration"></span></div>`;
+          if(m.transcript){
+            inner += `<div class="voice-transcript">📝 ${escapeHtml(m.transcript) || '(مفيش كلام اتعرف عليه)'}</div>`;
+            const tone = describeVoiceTone(m.audioStats);
+            if(tone && (tone.avgPitch || tone.loudLabel)){
+              inner += `<span class="voice-tone-badge">🎚️ ${escapeHtml(tone.pitchLabel)}${tone.loudLabel ? ' · ' + escapeHtml(tone.loudLabel) : ''}</span>`;
+            }
+          }
+        }
+      } else {
+        inner += `<span class="media-missing">📎 ملف مرفق (${escapeHtml(attachName)}) — مش موجود، ابعت كمان الـ zip بالميديا</span>`;
+      }
+    } else {
+      const emojiOnly = isEmojiOnlyContent(m.content) && !textQ;
+      if(emojiOnly) bubble.classList.add('emoji-only');
+      const bodyHtml = linkify(highlightText(escapeHtml(m.content), textQ)).replace(/\n/g,'<br>');
+      inner += emojiOnly ? `<span class="emoji-content">${bodyHtml}</span>` : bodyHtml;
+    }
+
+    inner += `<span class="meta">${escapeHtml(m.time)}${flatView ? ' · ' + escapeHtml(m.date) : ''}</span>`;
+    bubble.innerHTML = inner;
+
+    const imgEl = bubble.querySelector('[data-lightbox-src]');
+    if(imgEl){
+      imgEl.addEventListener('click', ()=> openLightbox(imgEl.getAttribute('data-lightbox-src')));
+    }
+
+    const audioEl = bubble.querySelector('.media-audio');
+    if(audioEl){
+      const durEl = bubble.querySelector('.audio-duration');
+      audioEl.addEventListener('loadedmetadata', ()=>{
+        if(durEl && isFinite(audioEl.duration)){
+          const mins = Math.floor(audioEl.duration / 60);
+          const secs = Math.floor(audioEl.duration % 60).toString().padStart(2, '0');
+          durEl.textContent = `${mins}:${secs}`;
+        }
+      });
+    }
+
+    const starBtn = document.createElement('button');
+    starBtn.className = 'star-btn';
+    starBtn.type = 'button';
+    starBtn.title = isStarred ? 'شيل من المميزة' : 'حفظ كرسالة مميزة';
+    starBtn.textContent = isStarred ? '★' : '☆';
+    starBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      toggleStar(m.id);
+    });
+    bubble.appendChild(starBtn);
+
+    if(!attachName){
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'copy-btn';
+      copyBtn.type = 'button';
+      copyBtn.title = 'نسخ الرسالة';
+      copyBtn.textContent = '📋';
+      copyBtn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        navigator.clipboard?.writeText(m.content).then(()=>{
+          copyBtn.textContent = '✓';
+          setTimeout(()=>{ copyBtn.textContent = '📋'; }, 1200);
+        }).catch(()=>{});
+      });
+      bubble.appendChild(copyBtn);
+    }
+
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+  });
+
+  if(remaining > 0){
+    const loadMore = document.createElement('button');
+    loadMore.className = 'load-more';
+    loadMore.type = 'button';
+    loadMore.textContent = `تحميل المزيد (${remaining} متبقية)`;
+    loadMore.addEventListener('click', ()=>{
+      currentPage++;
+      renderMessages();
+    });
+    messagesEl.appendChild(loadMore);
+  }
+
+  if(!flatView && !viewFromStart) messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function linkify(escapedText){
+  const urlRegex = /((?:https?:\/\/|www\.)[^\s<]+)/gi;
+  return escapedText.replace(urlRegex, (match)=>{
+    // Trim common trailing punctuation that isn't part of the URL
+    let trail = '';
+    const trailMatch = match.match(/[.,!?)\]]+$/);
+    let core = match;
+    if(trailMatch){
+      trail = trailMatch[0];
+      core = match.slice(0, -trail.length);
+    }
+    let href = core;
+    if(!/^https?:\/\//i.test(href)) href = 'https://' + href;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${core}</a>${trail}`;
+  });
+}
+
+function startOfDay(d){
+  const r = new Date(d);
+  r.setHours(0,0,0,0);
+  return r;
+}
+function endOfDay(d){
+  const r = new Date(d);
+  r.setHours(23,59,59,999);
+  return r;
+}
+function addDays(d, n){
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+// Recognizes a handful of Egyptian-Arabic relative-date phrases in the search
+// box (e.g. "امبارح", "الأسبوع اللي فات") and turns them into a date range,
+// so the search box can filter by day instead of matching text.
+function resolveDateQuery(rawQuery){
+  const q = rawQuery.trim();
+  if(!q) return null;
+  const today = startOfDay(new Date());
+
+  const exact = {
+    'النهاردة': 0, 'اليوم': 0,
+    'امبارح': -1, 'إمبارح': -1, 'يوم امبارح': -1, 'يوم إمبارح': -1,
+    'اول امبارح': -2, 'أول امبارح': -2, 'اول إمبارح': -2, 'أول أمبارح': -2, 'قبل امبارح': -2
+  };
+  if(exact.hasOwnProperty(q)){
+    const day = addDays(today, exact[q]);
+    return { from: startOfDay(day), to: endOfDay(day) };
+  }
+
+  const weekPhrases = ['الاسبوع اللي فات', 'الأسبوع اللي فات', 'اخر اسبوع', 'آخر أسبوع', 'اخر أسبوع'];
+  if(weekPhrases.includes(q)){
+    return { from: startOfDay(addDays(today, -6)), to: endOfDay(today) };
+  }
+
+  const monthPhrases = ['الشهر اللي فات', 'اخر شهر', 'آخر شهر'];
+  if(monthPhrases.includes(q)){
+    return { from: startOfDay(addDays(today, -29)), to: endOfDay(today) };
+  }
+
+  return null;
+}
+
+function highlightText(escapedContent, q){
+  if(!q) return escapedContent;
+  const escQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('(' + escQ + ')', 'ig');
+  return escapedContent.replace(re, '<mark>$1</mark>');
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// If this file was produced by "نسخة متكاملة" export, it carries its data
+// baked in as window.__EMBEDDED_CHAT__ — load straight into the chat view.
+function hydrateFromEmbedded(data){
+  allMessages = data.messages;
+  allMessages.forEach(m=>{
+    m.dateObj = parseWaDate(m.date);
+    m.timestamp = combineDateTime(m.dateObj, parseWaTime(m.time));
+  });
+  allMessages.senders = data.senders;
+  allMessages.primarySender = data.primarySender;
+  mediaMap = data.media || {};
+  mediaBlobs = {};
+  Object.entries(mediaMap).forEach(([name, dataUrl])=>{
+    try{
+      const [meta, b64] = dataUrl.split(',');
+      const mime = (meta.match(/data:([^;]+)/) || [,mimeFor(name)])[1];
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+      mediaBlobs[name] = new Blob([bytes], {type: mime});
+    }catch(e){ /* skip malformed entries */ }
+  });
+  starredIds = new Set(data.starred || []);
+  currentPage = 1;
+  viewFromStart = false;
+  storageKey = 'wa-viewer-starred-embedded-' + hashText(JSON.stringify(data.messages.slice(0,5)));
+  saveStarred();
+
+  chatTitle.textContent = data.title || 'محادثة';
+  chatSub.textContent = data.sub || '';
+  msgCount.textContent = data.messages.length + ' رسالة';
+  senderFilter.innerHTML = '<option value="">كل الأشخاص</option>' +
+    (data.senders || []).map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  const uniqueDates = [...new Set(data.messages.map(m=>m.date))];
+  dateJump.innerHTML = '<option value="">📅 التاريخ</option>' +
+    uniqueDates.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+
+  uploadScreen.style.display = 'none';
+  chatScreen.style.display = 'flex';
+  renderMessages();
+}
+
+if(window.__EMBEDDED_CHAT__){
+  hydrateFromEmbedded(window.__EMBEDDED_CHAT__);
+}
+</script>
+</body>
+</html>
